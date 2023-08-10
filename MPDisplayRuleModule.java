@@ -649,8 +649,8 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
             displayRule.setExtrusionZoomFrom(zoomFrom.floatValue());
-        } else {
             promise.resolve(null);
+        } else {
             reject(promise, displayRuleId);
         }
     }
