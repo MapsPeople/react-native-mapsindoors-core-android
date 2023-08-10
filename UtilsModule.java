@@ -15,6 +15,7 @@ import com.mapsindoors.core.MPPolygonGeometry;
 import com.mapsindoors.core.MPSolution;
 import com.mapsindoors.core.MPVenue;
 import com.mapsindoors.core.MapsIndoors;
+import com.mapsindoors.core.MPJsonParser;
 import com.mapsindoors.core.errors.MIError;
 import com.mapsindoors.core.errors.MIErrorEnum;
 import com.reactlibrary.core.models.MPError;
@@ -54,8 +55,8 @@ public class UtilsModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void pointAngleBetween(String point1, String point2, final Promise promise) {
-        MPPoint it = gson.fromJson(point1, MPPoint.class);
-        MPPoint other = gson.fromJson(point2, MPPoint.class);
+        MPPoint it = MPJsonParser.parse(point1, MPPoint.class);
+        MPPoint other = MPJsonParser.parse(point2, MPPoint.class);
 
         if (it != null && other != null) {
             promise.resolve(it.angleBetween(other));
@@ -66,8 +67,8 @@ public class UtilsModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void pointDistanceTo(String point1, String point2, final Promise promise) {
-        MPPoint it = gson.fromJson(point1, MPPoint.class);
-        MPPoint other = gson.fromJson(point2, MPPoint.class);
+        MPPoint it = MPJsonParser.parse(point1, MPPoint.class);
+        MPPoint other = MPJsonParser.parse(point2, MPPoint.class);
 
         if (it != null && other != null) {
             promise.resolve(it.distanceTo(other));
@@ -78,8 +79,8 @@ public class UtilsModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void geometryIsInside(String pointString, String geometryString, final Promise promise) {
-        MPPoint point = gson.fromJson(pointString, MPPoint.class);
-        MPGeometry geometry = gson.fromJson(geometryString, MPGeometry.class);
+        MPPoint point = MPJsonParser.parse(pointString, MPPoint.class);
+        MPGeometry geometry = MPJsonParser.parse(geometryString, MPGeometry.class);
         if (point != null && geometry != null) {
             promise.resolve(geometry.isInside(point.getLatLng()));
         } else {
@@ -89,7 +90,7 @@ public class UtilsModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void geometryArea(String geometryString, final Promise promise) {
-        MPGeometry geometry = gson.fromJson(geometryString, MPGeometry.class);
+        MPGeometry geometry = MPJsonParser.parse(geometryString, MPGeometry.class);
         if (geometry != null) {
             promise.resolve(geometry.getArea());
         } else {
@@ -98,9 +99,9 @@ public class UtilsModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void polygonDistToClosestEdge(String pointString, String geometryString, final Promise promise) {
-        MPPoint point = gson.fromJson(pointString, MPPoint.class);
-        MPGeometry geometry = gson.fromJson(geometryString, MPGeometry.class);
+    public void polygonDistanceToClosestEdge(String pointString, String geometryString, final Promise promise) {
+        MPPoint point = MPJsonParser.parse(pointString, MPPoint.class);
+        MPGeometry geometry = MPJsonParser.parse(geometryString, MPGeometry.class);
         if (geometry != null && point != null) {
             if (MPGeometry.POLYGON.equals(geometry.getType()) ) {
                 MPPolygonGeometry polygonGeometry = (MPPolygonGeometry) geometry;

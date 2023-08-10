@@ -228,30 +228,35 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void setMapPadding(int start, int top, int end, int bottom, final Promise promise) {
+        double density =  mCtx.getResources().getDisplayMetrics().density;
         mCtx.runOnUiQueueThread(() -> {
-            mMapControl.setMapPadding(start, top, end, bottom);
+            mMapControl.setMapPadding((int)Math.round(start * density), (int)Math.round(top * density), (int)Math.round(end * density), (int)   Math.round(bottom * density));
             promise.resolve(null);
         });
     }
 
     @ReactMethod
     public void getMapViewPaddingStart(final Promise promise) {
-        promise.resolve(mMapControl.getMapViewPaddingStart());
+        double density =  mCtx.getResources().getDisplayMetrics().density;
+        promise.resolve((int)Math.round(mMapControl.getMapViewPaddingStart()/density));
     }
 
     @ReactMethod
     public void getMapViewPaddingTop(final Promise promise) {
-        promise.resolve(mMapControl.getMapViewPaddingTop());
+        double density =  mCtx.getResources().getDisplayMetrics().density;
+        promise.resolve((int)Math.round(mMapControl.getMapViewPaddingTop()/density));
     }
 
     @ReactMethod
     public void getMapViewPaddingEnd(final Promise promise) {
-        promise.resolve(mMapControl.getMapViewPaddingEnd());
+        double density =  mCtx.getResources().getDisplayMetrics().density;
+        promise.resolve((int)Math.round(mMapControl.getMapViewPaddingEnd()/density));
     }
 
     @ReactMethod
     public void getMapViewPaddingBottom(final Promise promise) {
-        promise.resolve(mMapControl.getMapViewPaddingBottom());
+        double density =  mCtx.getResources().getDisplayMetrics().density;
+        promise.resolve((int)Math.round(mMapControl.getMapViewPaddingBottom()/density));
     }
 
     @ReactMethod
@@ -313,8 +318,10 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void hideFloorSelector(boolean hide, final Promise promise) {
-        mMapControl.hideFloorSelector(hide);
-        promise.resolve(null);
+        mCtx.runOnUiQueueThread(() -> {
+            mMapControl.hideFloorSelector(hide);
+            promise.resolve(null);
+        });
     }
 
     @ReactMethod
@@ -357,7 +364,8 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     public void animateCamera(String updateString, @Nullable Integer duration, final Promise promise) {
         MPCameraUpdate update = gson.fromJson(updateString, MPCameraUpdate.class);
         mCtx.runOnUiQueueThread(() -> {
-            mMapView.animateCamera(update, duration, error -> {
+            // we have to parse null as -1 because iOS cannot parse null
+            mMapView.animateCamera(update, (duration == - 1 ? null : duration), error -> {
                 promise.resolve(null);
             });
         });
