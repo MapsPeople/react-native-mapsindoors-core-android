@@ -110,6 +110,16 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
     }
 
     @ReactMethod
+    public void showRouteLegButtons(boolean value, final Promise promise) {
+        if (mRenderer != null) {
+            mRenderer.showRouteLegButtons(value);
+            promise.resolve(null);
+        } else {
+            rejectPromise(promise);
+        }
+    }
+
+    @ReactMethod
     public void setCameraAnimationDuration(int duration, final Promise promise) {
         if (mRenderer != null) {
             mRenderer.setCameraAnimationDuration(duration);
