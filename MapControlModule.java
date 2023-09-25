@@ -1,5 +1,6 @@
 package com.reactlibrary.core;
 
+import android.graphics.Typeface;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -396,6 +397,13 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
                 mMapControl.setFloorSelector(null);
             }
         }
+        promise.resolve(null);
+    }
+
+    @ReactMethod
+    public void setLabelOptions(int textSize, String color, boolean showHalo, final Promise promise) {
+        mMapControl.setMapLabelFont(Typeface.DEFAULT, color, showHalo);
+        mMapControl.setMapLabelTextSize(textSize);
         promise.resolve(null);
     }
 
