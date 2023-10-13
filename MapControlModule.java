@@ -401,9 +401,11 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     }
 
     @ReactMethod
-    public void setLabelOptions(int textSize, String color, boolean showHalo, final Promise promise) {
+    public void setLabelOptions(Integer textSize, String color, boolean showHalo, final Promise promise) {
         mMapControl.setMapLabelFont(Typeface.DEFAULT, color, showHalo);
-        mMapControl.setMapLabelTextSize(textSize);
+        if (textSize != -1) {
+            mMapControl.setMapLabelTextSize(textSize);
+        }
         promise.resolve(null);
     }
 
