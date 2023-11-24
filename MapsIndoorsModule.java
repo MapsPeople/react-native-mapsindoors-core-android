@@ -121,7 +121,7 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void getLocations(final Promise promise) {
-        List<MPLocation> locations = MapsIndoors.getLocations();
+        ArrayList<MPLocation> locations = new ArrayList<>(MapsIndoors.getLocations());
         if (!locations.isEmpty()) {
             String locationsString = gson.toJson(locations);
             promise.resolve(locationsString);
