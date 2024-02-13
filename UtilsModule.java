@@ -1,4 +1,4 @@
-package com.reactlibrary.core;
+package com.mapsindoorsrn.core;
 
 import androidx.annotation.NonNull;
 
@@ -18,7 +18,7 @@ import com.mapsindoors.core.MapsIndoors;
 import com.mapsindoors.core.MPJsonParser;
 import com.mapsindoors.core.errors.MIError;
 import com.mapsindoors.core.errors.MIErrorEnum;
-import com.reactlibrary.core.models.MPError;
+import com.mapsindoorsrn.core.models.MPError;
 
 public class UtilsModule extends ReactContextBaseJavaModule {
 
@@ -142,6 +142,15 @@ public class UtilsModule extends ReactContextBaseJavaModule {
         MPSolution solution = MapsIndoors.getSolution();
         if (solution != null) {
             solution.getConfig().setEnableClustering(enable);
+        }
+        promise.resolve(null);
+    }
+
+    @ReactMethod
+    public void setNewSelection(boolean enable, final Promise promise) {
+        MPSolution solution = MapsIndoors.getSolution();
+        if (solution != null) {
+            solution.getConfig().setNewSelection(enable);
         }
         promise.resolve(null);
     }

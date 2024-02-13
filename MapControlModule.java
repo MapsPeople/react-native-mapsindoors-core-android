@@ -1,4 +1,4 @@
-package com.reactlibrary.core;
+package com.mapsindoorsrn.core;
 
 import android.graphics.Typeface;
 import android.view.View;
@@ -21,6 +21,7 @@ import com.mapsindoors.core.MPFilter;
 import com.mapsindoors.core.MPFilterBehavior;
 import com.mapsindoors.core.MPFloor;
 import com.mapsindoors.core.MPFloorSelectorInterface;
+import com.mapsindoors.core.MPHighlightBehavior;
 import com.mapsindoors.core.MPIMapConfig;
 import com.mapsindoors.core.MPLocation;
 import com.mapsindoors.core.MPPoint;
@@ -36,10 +37,10 @@ import com.mapsindoors.core.errors.MIError;
 import com.mapsindoors.core.models.MPCameraEvent;
 import com.mapsindoors.core.models.MPCameraEventListener;
 import com.mapsindoors.core.models.MPMapStyle;
-import com.reactlibrary.core.models.Filter;
-import com.reactlibrary.core.models.Location;
-import com.reactlibrary.core.models.MPCameraUpdate;
-import com.reactlibrary.core.models.MPError;
+import com.mapsindoorsrn.core.models.Filter;
+import com.mapsindoorsrn.core.models.Location;
+import com.mapsindoorsrn.core.models.MPCameraUpdate;
+import com.mapsindoorsrn.core.models.MPError;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -129,6 +130,32 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
         if (mMapControl != null) {
             mCtx.runOnUiQueueThread(() -> {
                 mMapControl.clearFilter();
+                promise.resolve(null);
+            });
+        }
+    }
+
+    @ReactMethod
+    public void setHighlight(String locationsString, String highlightBehaviorString, final Promise promise) {
+        ArrayList<String> locationIds = gson.fromJson(locationsString, new TypeToken<List<String>>() {}.getType());
+        List<MPLocation> locations = new ArrayList<>();
+        for (String locationId : locationIds) {
+            locations.add(MapsIndoors.getLocationById(locationId));
+        }
+        MPHighlightBehavior highlightBehavior = gson.fromJson(highlightBehaviorString, MPHighlightBehavior.class);
+        if (mMapControl != null) {
+            mMapControl.setHighlight(locations, highlightBehavior);
+            promise.resolve(true);
+        }else {
+            promise.resolve(false);
+        }
+    }
+
+    @ReactMethod
+    public void clearHighlight(final Promise promise) {
+        if (mMapControl != null) {
+            mCtx.runOnUiQueueThread(() -> {
+                mMapControl.clearHighlight();
                 promise.resolve(null);
             });
         }

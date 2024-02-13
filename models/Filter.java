@@ -1,4 +1,4 @@
-package com.reactlibrary.core.models;
+package com.mapsindoorsrn.core.models;
 
 import com.google.gson.annotations.SerializedName;
 import com.mapsindoors.core.MPFilter;

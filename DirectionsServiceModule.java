@@ -1,4 +1,4 @@
-package com.reactlibrary.core;
+package com.mapsindoorsrn.core;
 
 import androidx.annotation.NonNull;
 
@@ -50,7 +50,29 @@ public class DirectionsServiceModule extends ReactContextBaseJavaModule {
     public void clearWayType(final String id, final Promise promise) {
         MPDirectionsService service = serviceMap.get(id);
         if (service != null) {
-            service.clearWayType();
+            service.clearAvoidWayType();
+            promise.resolve(null);
+        } else {
+            promise.reject(NO_DS,new MapsIndoorsException((NO_DS)));
+        }
+    }
+
+    @ReactMethod
+    public void addExcludeWayType(String wayType, final String id, final Promise promise) {
+        MPDirectionsService service = serviceMap.get(id);
+        if (service != null) {
+            service.addExcludeWayType(wayType);
+            promise.resolve(null);
+        } else {
+            promise.reject(NO_DS,new MapsIndoorsException((NO_DS)));
+        }
+    }
+
+    @ReactMethod
+    public void clearExcludeWayType(final String id, final Promise promise) {
+        MPDirectionsService service = serviceMap.get(id);
+        if (service != null) {
+            service.clearExcludeWayType();
             promise.resolve(null);
         } else {
             promise.reject(NO_DS,new MapsIndoorsException((NO_DS)));
