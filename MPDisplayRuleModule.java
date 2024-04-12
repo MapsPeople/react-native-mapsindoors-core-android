@@ -1,4 +1,4 @@
-package com.reactlibrary.core;
+package com.mapsindoorsrn.core;
 
 import androidx.annotation.NonNull;
 
@@ -7,13 +7,16 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.google.gson.Gson;
+import com.mapsindoors.core.MPBadgePosition;
 import com.mapsindoors.core.MPDisplayRule;
+import com.mapsindoors.core.MPIconPlacement;
 import com.mapsindoors.core.MPIconSize;
+import com.mapsindoors.core.MPLabelType;
 import com.mapsindoors.core.MPSolutionDisplayRule;
 import com.mapsindoors.core.MapsIndoors;
 import com.mapsindoors.core.errors.MIError;
 import com.mapsindoors.core.errors.MIErrorEnum;
-import com.reactlibrary.core.models.MPError;
+import com.mapsindoorsrn.core.models.MPError;
 
 public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     private final Gson gson = new Gson();
@@ -55,10 +58,10 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void setVisible(String displayRuleId, boolean isVisible, final Promise promise) {
+    public void setVisible(String displayRuleId, String isVisible, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setVisible(isVisible);
+            displayRule.setVisible(Boolean.valueOf(isVisible));
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -76,10 +79,10 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void setIconVisible(String displayRuleId, boolean iconVisible, final Promise promise) {
+    public void setIconVisible(String displayRuleId, String iconVisible, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setIconVisible(iconVisible);
+            displayRule.setIconVisible(Boolean.valueOf(iconVisible));
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -97,10 +100,10 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void setPolygonVisible(String displayRuleId, boolean polygonVisible, final Promise promise) {
+    public void setPolygonVisible(String displayRuleId, String polygonVisible, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setPolygonVisible(polygonVisible);
+            displayRule.setPolygonVisible(Boolean.valueOf(polygonVisible));
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -118,10 +121,10 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void setLabelVisible(String displayRuleId, boolean labelVisible, final Promise promise) {
+    public void setLabelVisible(String displayRuleId, String labelVisible, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setLabelVisible(labelVisible);
+            displayRule.setLabelVisible(Boolean.valueOf(labelVisible));
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -139,10 +142,10 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void setModel2DVisible(String displayRuleId, boolean model2DVisible, final Promise promise) {
+    public void setModel2DVisible(String displayRuleId, String model2DVisible, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setModel2DVisible(model2DVisible);
+            displayRule.setModel2DVisible(Boolean.valueOf(model2DVisible));
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -160,10 +163,10 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void setWallVisible(String displayRuleId, boolean wallVisible, final Promise promise) {
+    public void setWallVisible(String displayRuleId, String wallVisible, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setWallVisible(wallVisible);
+            displayRule.setWallVisible(Boolean.valueOf(wallVisible));
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -181,10 +184,10 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void setExtrusionVisible(String displayRuleId, boolean extrusionVisible, final Promise promise) {
+    public void setExtrusionVisible(String displayRuleId, String extrusionVisible, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setExtrusionVisible(extrusionVisible);
+            displayRule.setExtrusionVisible(Boolean.valueOf(extrusionVisible));
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -205,7 +208,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setZoomFrom(String displayRuleId, Double zoomFrom, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setZoomFrom(zoomFrom.floatValue());
+            if (zoomFrom == -1) {
+                displayRule.setZoomFrom(null);
+            }else {
+                displayRule.setZoomFrom(zoomFrom.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -226,7 +233,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setZoomTo(String displayRuleId, Double zoomTo, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setZoomTo(zoomTo.floatValue());
+            if (zoomTo == -1) {
+                displayRule.setZoomTo(null);
+            }else {
+                displayRule.setZoomTo(zoomTo.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -312,7 +323,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setLabelZoomFrom(String displayRuleId, Double zoomFrom, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setLabelZoomFrom(zoomFrom.floatValue());
+            if (zoomFrom == -1) {
+                displayRule.setLabelZoomFrom(null);
+            }else {
+                displayRule.setLabelZoomFrom(zoomFrom.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -333,7 +348,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setLabelZoomTo(String displayRuleId, Double zoomTo, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setLabelZoomTo(zoomTo.floatValue());
+            if (zoomTo == -1) {
+                displayRule.setLabelZoomTo(null);
+            }else {
+                displayRule.setLabelZoomTo(zoomTo.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -354,7 +373,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setLabelMaxWidth(String displayRuleId, Double labelMaxWidth, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setLabelMaxWidth(labelMaxWidth.intValue());
+            if (labelMaxWidth == -1) {
+                displayRule.setLabelMaxWidth(null);
+            }else {
+                displayRule.setLabelMaxWidth(labelMaxWidth.intValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -375,7 +398,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setPolygonZoomFrom(String displayRuleId, Double zoomFrom, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setPolygonZoomFrom(zoomFrom.floatValue());
+            if (zoomFrom == -1) {
+                displayRule.setPolygonZoomFrom(null);
+            }else {
+                displayRule.setPolygonZoomFrom(zoomFrom.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -396,7 +423,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setPolygonZoomTo(String displayRuleId, Double polygonZoomTo, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setPolygonZoomTo(polygonZoomTo.floatValue());
+            if (polygonZoomTo == -1) {
+                displayRule.setPolygonZoomTo(null);
+            }else {
+                displayRule.setPolygonZoomTo(polygonZoomTo.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -417,7 +448,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setPolygonStrokeWidth(String displayRuleId, Double strokeWidth, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setPolygonStrokeWidth(strokeWidth.floatValue());
+            if (strokeWidth == -1) {
+                displayRule.setPolygonStrokeWidth(null);
+            }else {
+                displayRule.setPolygonStrokeWidth(strokeWidth.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -459,7 +494,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setPolygonStrokeOpacity(String displayRuleId, Double polygonStrokeOpacity, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setPolygonStrokeOpacity(polygonStrokeOpacity.floatValue());
+            if (polygonStrokeOpacity == -1) {
+                displayRule.setPolygonStrokeOpacity(null);
+            }else {
+                displayRule.setPolygonStrokeOpacity(polygonStrokeOpacity.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -480,7 +519,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setPolygonFillOpacity(String displayRuleId, Double polygonFillOpacity, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setPolygonFillOpacity(polygonFillOpacity.floatValue());
+            if (polygonFillOpacity == -1) {
+                displayRule.setPolygonFillOpacity(null);
+            }else {
+                displayRule.setPolygonFillOpacity(polygonFillOpacity.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -543,7 +586,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setWallHeight(String displayRuleId, Double wallHeight, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setWallHeight(wallHeight.floatValue());
+            if (wallHeight == -1) {
+                displayRule.setWallHeight(null);
+            }else {
+                displayRule.setWallHeight(wallHeight.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -564,7 +611,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setWallZoomFrom(String displayRuleId, Double zoomFrom, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setWallZoomFrom(zoomFrom.floatValue());
+            if (zoomFrom == -1) {
+                displayRule.setWallZoomFrom(null);
+            }else {
+                displayRule.setWallZoomFrom(zoomFrom.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -585,7 +636,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setWallZoomTo(String displayRuleId, Double zoomTo, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setWallZoomTo(zoomTo.floatValue());
+            if (zoomTo == -1) {
+                displayRule.setWallZoomTo(null);
+            }else {
+                displayRule.setWallZoomTo(zoomTo.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -627,7 +682,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setExtrusionHeight(String displayRuleId, Double extrusionHeight, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setExtrusionHeight(extrusionHeight.floatValue());
+            if (extrusionHeight == -1) {
+                displayRule.setExtrusionHeight(null);
+            }else {
+                displayRule.setExtrusionHeight(extrusionHeight.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -648,7 +707,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setExtrusionZoomFrom(String displayRuleId, Double zoomFrom, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setExtrusionZoomFrom(zoomFrom.floatValue());
+            if (zoomFrom == -1) {
+                displayRule.setExtrusionZoomFrom(null);
+            }else {
+                displayRule.setExtrusionZoomFrom(zoomFrom.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -669,7 +732,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setExtrusionZoomTo(String displayRuleId, Double zoomTo, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setExtrusionZoomTo(zoomTo.floatValue());
+            if (zoomTo == -1) {
+                displayRule.setWallZoomTo(null);
+            }else {
+                displayRule.setExtrusionZoomTo(zoomTo.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -690,7 +757,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setModel2DZoomFrom(String displayRuleId, Double zoomFrom, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setModel2DZoomFrom(zoomFrom.floatValue());
+            if (zoomFrom == -1) {
+                displayRule.setModel2DZoomFrom(null);
+            }else {
+                displayRule.setModel2DZoomFrom(zoomFrom.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -711,7 +782,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setModel2DZoomTo(String displayRuleId, Double zoomTo, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setModel2DZoomTo(zoomTo.floatValue());
+            if (zoomTo == -1) {
+                displayRule.setModel2DZoomTo(null);
+            }else {
+                displayRule.setModel2DZoomTo(zoomTo.floatValue());
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -732,7 +807,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setModel2DWidthMeters(String displayRuleId, Double width, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setModel2DWidthMeters(width);
+            if (width == -1) {
+                displayRule.setModel2DWidthMeters(null);
+            }else {
+                displayRule.setModel2DWidthMeters(width);
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -753,7 +832,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setModel2DHeightMeters(String displayRuleId, Double height, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setModel2DHeightMeters(height);
+            if (height == -1) {
+                displayRule.setModel2DHeightMeters(null);
+            }else {
+                displayRule.setModel2DHeightMeters(height);
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -774,7 +857,11 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public void setModel2DBearing(String displayRuleId, Double bearing, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
-            displayRule.setModel2DBearing(bearing);
+            if (bearing == -1) {
+                displayRule.setModel2DBearing(null);
+            }else {
+                displayRule.setModel2DBearing(bearing);
+            }
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
@@ -796,6 +883,589 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
             displayRule.setModel2DModel(model);
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getIconScale(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getIconScale());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setIconScale(String displayRuleId, Double scale, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (scale == -1) {
+                displayRule.setIconScale(null);
+            }else {
+                displayRule.setIconScale(scale.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getIconPlacement(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getIconPlacement() != null ? displayRule.getIconPlacement().ordinal() : null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setIconPlacement(String displayRuleId, Integer placement, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (placement == -1) {
+                displayRule.setIconPlacement(null);
+            }else {
+                MPIconPlacement iconPlacement;
+                switch (placement) {
+                    case 1:
+                        iconPlacement = MPIconPlacement.ABOVE;
+                        break;
+                    case 2:
+                        iconPlacement = MPIconPlacement.BELOW;
+                        break;
+                    case 3:
+                        iconPlacement = MPIconPlacement.LEFT;
+                        break;
+                    case 4:
+                        iconPlacement = MPIconPlacement.RIGHT;
+                        break;
+                    default:
+                        iconPlacement = MPIconPlacement.CENTER;
+                        break;
+                }
+                displayRule.setIconPlacement(iconPlacement);
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getLabelType(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getLabelType() != null ? displayRule.getLabelType().ordinal() : null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setLabelType(String displayRuleId, Integer type, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (type == -1) {
+                displayRule.setLabelType(null);
+            }else {
+                MPLabelType labelType;
+                switch (type) {
+                    case 1:
+                        labelType = MPLabelType.FLAT;
+                        break;
+                    default:
+                        labelType = MPLabelType.FLOATING;
+                        break;
+                }
+                displayRule.setLabelType(labelType);
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getLabelStyleTextSize(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getLabelStyleTextSize());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setLabelStyleTextSize(String displayRuleId, Double textSize, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (textSize == -1) {
+                displayRule.setLabelStyleTextSize(null);
+            }else {
+                displayRule.setLabelStyleTextSize(textSize.intValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getLabelStyleTextColor(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getLabelStyleTextColor());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setLabelStyleTextColor(String displayRuleId, String color, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            displayRule.setLabelStyleTextColor(color);
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getLabelStyleTextOpacity(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getLabelStyleTextOpacity());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setLabelStyleTextOpacity(String displayRuleId, Double opacity, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (opacity == -1) {
+                displayRule.setLabelStyleTextOpacity(null);
+            }else {
+                displayRule.setLabelStyleTextOpacity(opacity.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getLabelStyleHaloColor(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getLabelStyleHaloColor());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setLabelStyleHaloColor(String displayRuleId, String color, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            displayRule.setLabelStyleHaloColor(color);
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getLabelStyleHaloWidth(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getLabelStyleHaloWidth());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setLabelStyleHaloWidth(String displayRuleId, Double width, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (width == -1) {
+                displayRule.setLabelStyleHaloWidth(null);
+            }else {
+                displayRule.setLabelStyleHaloWidth(width.intValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getLabelStyleHaloBlur(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getLabelStyleHaloBlur());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setLabelStyleHaloBlur(String displayRuleId, Double blur, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (blur == -1) {
+                displayRule.setLabelStyleHaloBlur(null);
+            }else {
+                displayRule.setLabelStyleHaloBlur(blur.intValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getLabelStyleBearing(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getLabelStyleBearing());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setLabelStyleBearing(String displayRuleId, Double bearing, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (bearing == -1) {
+                displayRule.setLabelStyleBearing(null);
+            }else {
+                displayRule.setLabelStyleBearing(bearing.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getPolygonLightnessFactor(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getPolygonLightnessFactor());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setPolygonLightnessFactor(String displayRuleId, Double factor, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (factor == -1) {
+                displayRule.setPolygonLightnessFactor(null);
+            }else {
+                displayRule.setPolygonLightnessFactor(factor.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getWallLightnessFactor(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getWallLightnessFactor());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setWallLightnessFactor(String displayRuleId, Double factor, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (factor == -1) {
+                displayRule.setWallLightnessFactor(null);
+            }else {
+                displayRule.setWallLightnessFactor(factor.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getExtrusionLightnessFactor(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getExtrusionLightnessFactor());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setExtrusionLightnessFactor(String displayRuleId, Double factor, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (factor == -1) {
+                displayRule.setExtrusionLightnessFactor(null);
+            }else {
+                displayRule.setExtrusionLightnessFactor(factor.floatValue());
+            }
+            displayRule.setExtrusionLightnessFactor(factor.floatValue());
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void isBadgeVisible(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.isBadgeVisible());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setBadgeVisible(String displayRuleId, String visible, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            displayRule.setBadgeVisible(Boolean.valueOf(visible));
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getBadgeZoomFrom(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getBadgeZoomFrom());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setBadgeZoomFrom(String displayRuleId, Double zoomFrom, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (zoomFrom == -1) {
+                displayRule.setBadgeZoomFrom(null);
+            }else {
+                displayRule.setBadgeZoomFrom(zoomFrom.floatValue());
+            }
+            displayRule.setBadgeZoomFrom(zoomFrom.floatValue());
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getBadgeZoomTo(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getBadgeZoomTo());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setBadgeZoomTo(String displayRuleId, Double zoomTo, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (zoomTo == -1) {
+                displayRule.setBadgeZoomTo(null);
+            }else {
+                displayRule.setBadgeZoomTo(zoomTo.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getBadgeRadius(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getBadgeRadius());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setBadgeRadius(String displayRuleId, Double radius, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (radius == -1) {
+                displayRule.setBadgeRadius(null);
+            }else {
+                displayRule.setBadgeRadius(radius.intValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getBadgeStrokeWidth(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getBadgeStrokeWidth());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setBadgeStrokeWidth(String displayRuleId, Double strokeWidth, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (strokeWidth == -1) {
+                displayRule.setBadgeStrokeWidth(null);
+            }else {
+                displayRule.setBadgeStrokeWidth(strokeWidth.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getBadgeStrokeColor(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getBadgeStrokeColor());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setBadgeStrokeColor(String displayRuleId, String color, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            displayRule.setBadgeStrokeColor(color);
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getBadgeFillColor(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getBadgeFillColor());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setBadgeFillColor(String displayRuleId, String color, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            displayRule.setBadgeFillColor(color);
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getBadgeScale(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getBadgeScale());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setBadgeScale(String displayRuleId, Double scale, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (scale == -1) {
+                displayRule.setBadgeScale(null);
+            }else {
+                displayRule.setBadgeScale(scale.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getBadgePosition(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            MPBadgePosition badgePosition = displayRule.getBadgePosition();
+            if (badgePosition != null) {
+                if (badgePosition.equals(MPBadgePosition.bottomLeft)) {
+                    promise.resolve(1);
+                }else if (badgePosition.equals(MPBadgePosition.bottomRight)) {
+                    promise.resolve(0);
+                }else if (badgePosition.equals(MPBadgePosition.topLeft)) {
+                    promise.resolve(2);
+                }else {
+                    promise.resolve(3);
+                }
+            }else {
+                promise.resolve(null);
+            }
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setBadgePosition(String displayRuleId, Integer position, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            MPBadgePosition badgePosition;
+            switch (position) {
+                case 1:
+                    badgePosition = MPBadgePosition.bottomLeft;
+                    break;
+                case 2:
+                    badgePosition = MPBadgePosition.topLeft;
+                    break;
+                case 3:
+                    badgePosition = MPBadgePosition.topRight;
+                    break;
+                default:
+                    badgePosition = MPBadgePosition.bottomRight;
+                    break;
+            }
+            displayRule.setBadgePosition(badgePosition);
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);

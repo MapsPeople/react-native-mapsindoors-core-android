@@ -1,4 +1,4 @@
-package com.reactlibrary.core.models;
+package com.mapsindoorsrn.core.models;
 
 import androidx.annotation.Nullable;
 

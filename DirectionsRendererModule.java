@@ -1,4 +1,4 @@
-package com.reactlibrary.core;
+package com.mapsindoorsrn.core;
 
 import android.graphics.Color;
 
@@ -21,7 +21,7 @@ import com.mapsindoors.core.OnMapControlReadyListener;
 import com.mapsindoors.core.errors.MIError;
 import com.mapsindoors.core.errors.MIErrorEnum;
 import com.mapsindoors.core.errors.MapsIndoorsException;
-import com.reactlibrary.core.models.MPError;
+import com.mapsindoorsrn.core.models.MPError;
 
 
 public class DirectionsRendererModule extends ReactContextBaseJavaModule implements OnMapControlReadyListener {

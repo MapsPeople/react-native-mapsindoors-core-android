@@ -1,4 +1,4 @@
-package com.reactlibrary.core;
+package com.mapsindoorsrn.core;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
@@ -25,11 +25,11 @@ import com.mapsindoors.core.MPVenueCollection;
 import com.mapsindoors.core.MapsIndoors;
 import com.mapsindoors.core.errors.MIError;
 import com.mapsindoors.core.models.MPMapStyle;
-import com.reactlibrary.core.models.Filter;
-import com.reactlibrary.core.models.MPError;
-import com.reactlibrary.core.models.PositionProvider;
-import com.reactlibrary.core.models.PositionResult;
-import com.reactlibrary.core.models.Query;
+import com.mapsindoorsrn.core.models.Filter;
+import com.mapsindoorsrn.core.models.MPError;
+import com.mapsindoorsrn.core.models.PositionProvider;
+import com.mapsindoorsrn.core.models.PositionResult;
+import com.mapsindoorsrn.core.models.Query;
 
 import java.util.ArrayList;
 import java.util.List;
