@@ -324,7 +324,7 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
             if (zoomFrom == -1) {
-                displayRule.setZoomFrom(null);
+                displayRule.setLabelZoomFrom(null);
             }else {
                 displayRule.setLabelZoomFrom(zoomFrom.floatValue());
             }
