@@ -17,6 +17,7 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.mapsindoors.core.MPBuilding;
+import com.mapsindoors.core.MPFeatureType;
 import com.mapsindoors.core.MPFilter;
 import com.mapsindoors.core.MPFilterBehavior;
 import com.mapsindoors.core.MPFloor;
@@ -26,6 +27,7 @@ import com.mapsindoors.core.MPIMapConfig;
 import com.mapsindoors.core.MPLocation;
 import com.mapsindoors.core.MPPoint;
 import com.mapsindoors.core.MPSelectionBehavior;
+import com.mapsindoors.core.MPSelectionMode;
 import com.mapsindoors.core.MPVenue;
 import com.mapsindoors.core.MapControl;
 import com.mapsindoors.core.MapsIndoors;
@@ -536,6 +538,84 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
         } else {
             mMapControl.removeOnFloorUpdateListener(this);
         }
+    }
+
+    @ReactMethod
+    public void setBuildingSelectionMode(Double selectionMode, final Promise promise) {
+        switch (selectionMode.intValue()) {
+            case 0:
+                mMapControl.setBuildingSelectionMode(MPSelectionMode.MANUAL);
+                break;
+            case 1:
+                mMapControl.setBuildingSelectionMode(MPSelectionMode.AUTOMATIC);
+                break;
+        }
+        promise.resolve(null);
+    }
+
+    @ReactMethod
+    public void getBuildingSelectionMode(final Promise promise) {
+        promise.resolve(mMapControl.getBuildingSelectionMode().ordinal());
+    }
+
+    @ReactMethod
+    public void setFloorSelectionMode(Double selectionMode, final Promise promise) {
+        switch (selectionMode.intValue()) {
+            case 0:
+                mMapControl.setFloorSelectionMode(MPSelectionMode.MANUAL);
+                break;
+            case 1:
+                mMapControl.setFloorSelectionMode(MPSelectionMode.AUTOMATIC);
+                break;
+        }
+        promise.resolve(null);
+    }
+
+    @ReactMethod
+    public void getFloorSelectionMode(final Promise promise) {
+        promise.resolve(mMapControl.getFloorSelectionMode().ordinal());
+    }
+
+    @ReactMethod
+    public void setHiddenFeatures(String featuresString, final Promise promise) {
+        List<Integer> featureStrings = gson.fromJson(featuresString, new TypeToken<List<Integer>>() {}.getType());
+        List<MPFeatureType> features = new ArrayList<>();
+        for (Integer feature : featureStrings) {
+            switch (feature) {
+                case 1:
+                    features.add(MPFeatureType.WALLS_2D);
+                    break;
+                case 3:
+                    features.add(MPFeatureType.WALLS_3D);
+                    break;
+                case 0:
+                    features.add(MPFeatureType.MODEL_2D);
+                    break;
+                case 2:
+                    features.add(MPFeatureType.MODEL_3D);
+                    break;
+                case 4:
+                    features.add(MPFeatureType.EXTRUSION_3D);
+                    break;
+                case 5:
+                    features.add(MPFeatureType.EXTRUDED_BUILDINGS);
+                    break;
+            }
+        }
+        getCurrentActivity().runOnUiThread(()-> {
+            mMapControl.setHiddenFeatures(features);
+            promise.resolve(null);
+        });
+    }
+
+    @ReactMethod
+    public void getHiddenFeatures(final Promise promise) {
+        List<MPFeatureType> features = mMapControl.getHiddenFeatures();
+        List<Integer> featureStrings = new ArrayList<>();
+        for (MPFeatureType feature : features) {
+            featureStrings.add(feature.ordinal());
+        }
+        promise.resolve(gson.toJson(featureStrings));
     }
 
     @Override

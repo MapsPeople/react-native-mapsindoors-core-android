@@ -56,14 +56,32 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void loadMapsIndoors(String apiKey, final Promise promise) {
-        MapsIndoors.load(reactContext.getApplicationContext(), apiKey, miError -> {
-            if (miError == null) {
-                promise.resolve(null);
+    public void loadMapsIndoors(String apiKey, ReadableArray optionalStrings, Promise promise) {
+        try {
+            if (optionalStrings != null) {
+                List<String> venueList = new ArrayList<>();
+                for (int i = 0; i < optionalStrings.size(); i++) {
+                    venueList.add(optionalStrings.getString(i));
+                }
+                MapsIndoors.load(reactContext.getApplicationContext(), apiKey, venueList, miError -> {
+                    if (miError == null) {
+                        promise.resolve(null);
+                    } else {
+                        reject(promise, miError);
+                    }
+                });
             } else {
-                reject(promise, miError);
+                MapsIndoors.load(reactContext.getApplicationContext(), apiKey, miError -> {
+                    if (miError == null) {
+                        promise.resolve(null);
+                    } else {
+                        reject(promise, miError);
+                    }
+                });
             }
-        });
+        } catch (Exception e) {
+            reject(promise, new MIError(MIError.UNKNOWN_ERROR, e.getMessage()));
+        }
     }
 
     @ReactMethod
@@ -324,4 +342,42 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
         MapsIndoors.reverseGeoCode(point, mpGeoCodeResult -> promise.resolve(gson.toJson(mpGeoCodeResult)));
     }
 
+    @ReactMethod
+    public void addVenuesToSync(ReadableArray venues, Promise promise) {
+        try {
+            List<String> venueList = new ArrayList<>();
+            for (int i = 0; i < venues.size(); i++) {
+                venueList.add(venues.getString(i));
+            }
+            MapsIndoors.addVenuesToSync(venueList);
+            promise.resolve(null);
+        } catch (Exception e) {
+            promise.reject(e);
+        }
+    }
+    
+    @ReactMethod
+    public void removeVenuesToSync(ReadableArray venues, Promise promise) {
+        try {
+            List<String> venueList = new ArrayList<>();
+            for (int i = 0; i < venues.size(); i++) {
+                venueList.add(venues.getString(i));
+            }
+            MapsIndoors.removeVenuesToSync(venueList);
+            promise.resolve(null);
+        } catch (Exception e) {
+            promise.reject(e);
+        }
+    }
+
+    @ReactMethod
+    public void getSyncedVenues(final Promise promise) {
+        List<String> venues = MapsIndoors.getSyncedVenues();
+        if (venues != null) {
+            ReadableArray array = Arguments.fromList(venues);
+            promise.resolve(array);
+        } else {
+            promise.resolve(null);
+        }
+    }
 }

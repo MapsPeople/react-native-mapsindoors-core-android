@@ -9,7 +9,10 @@ import com.facebook.react.bridge.ReactMethod;
 import com.google.gson.Gson;
 import com.mapsindoors.core.MPCollisionHandling;
 import com.mapsindoors.core.MPGeometry;
+import com.mapsindoors.core.MPLocation;
+import com.mapsindoors.core.MPLocationSettings;
 import com.mapsindoors.core.MPMultiPolygonGeometry;
+import com.mapsindoors.core.MPPOIType;
 import com.mapsindoors.core.MPPoint;
 import com.mapsindoors.core.MPPolygonGeometry;
 import com.mapsindoors.core.MPSolution;
@@ -19,6 +22,8 @@ import com.mapsindoors.core.MPJsonParser;
 import com.mapsindoors.core.errors.MIError;
 import com.mapsindoors.core.errors.MIErrorEnum;
 import com.mapsindoorsrn.core.models.MPError;
+
+import java.util.Locale;
 
 public class UtilsModule extends ReactContextBaseJavaModule {
 
@@ -170,6 +175,40 @@ public class UtilsModule extends ReactContextBaseJavaModule {
         if (solution != null) {
             solution.getConfig().getSettings3D().setWallOpacity(wallOpacity.floatValue());
         }
+        promise.resolve(null);
+    }
+
+    @ReactMethod
+    public void setSelectable(String id, boolean selectable, final Promise promise) {
+        MPSolution solution = MapsIndoors.getSolution();
+        if (solution != null) {
+            if (id.equals("solution")) {
+                solution.getConfig().getLocationSettings().setSelectable(selectable);
+            } else {
+                MPLocation location = MapsIndoors.getLocationById(id);
+                if (location != null) {
+                    if (location.getLocationSettings() == null) {
+                        location.setLocationSettings(new MPLocationSettings(selectable));
+                    }else {
+                        location.getLocationSettings().setSelectable(selectable);
+                    }
+                }else {
+                    for (MPPOIType type : solution.getTypes()) {
+                        if (type.getName().equals(id.toLowerCase(Locale.ROOT))) {
+                            if (type.getLocationSettings() == null) {
+                                type.setLocationSettings(new MPLocationSettings(selectable));
+                            }else {
+                                type.getLocationSettings().setSelectable(selectable);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        } else {
+            reject(promise, new MIError(MIErrorEnum.UNKNOWN_ERROR, "Solution is null, MapsIndoors needs to be loaded before setting selectable"));
+        }
+
         promise.resolve(null);
     }
 }

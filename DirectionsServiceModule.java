@@ -8,13 +8,16 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.bridge.ReadableArray;
 import com.google.gson.Gson;
 import com.mapsindoors.core.MPDirectionsService;
 import com.mapsindoors.core.MPPoint;
 import com.mapsindoors.core.errors.MapsIndoorsException;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 
 public class DirectionsServiceModule extends ReactContextBaseJavaModule {
@@ -91,7 +94,7 @@ public class DirectionsServiceModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void getRoute(String originString, String destinationString, final String id, final Promise promise) {
+    public void getRoute(String originString, String destinationString, ReadableArray stops, boolean optimized, final String id, final Promise promise) {
         MPDirectionsService service = serviceMap.get(id);
         if (service != null) {
             service.setRouteResultListener((route, error) -> {
@@ -107,8 +110,19 @@ public class DirectionsServiceModule extends ReactContextBaseJavaModule {
             MPPoint origin = gson.fromJson(originString, MPPoint.class);
             MPPoint destination = gson.fromJson(destinationString, MPPoint.class);
 
+            List<MPPoint> points = new ArrayList<>();
+            if (stops != null) {
+                for (int i = 0; i < stops.size(); i++) {
+                    points.add(gson.fromJson(stops.getString(i), MPPoint.class));
+                }
+            }
+
             if (origin != null && destination != null) {
-                service.query(origin, destination);
+                if (!points.isEmpty()) {
+                    service.query(origin, destination, points, optimized);
+                } else {
+                    service.query(origin, destination);
+                }
             } else {
                 promise.reject(new MapsIndoorsException("Origin:" + originString +
                         ", or Destination:" + destinationString + ", are not parsable"));

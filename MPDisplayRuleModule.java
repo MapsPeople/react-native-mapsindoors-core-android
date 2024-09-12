@@ -1,5 +1,7 @@
 package com.mapsindoorsrn.core;
 
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 
 import com.facebook.react.bridge.Promise;
@@ -11,6 +13,7 @@ import com.mapsindoors.core.MPBadgePosition;
 import com.mapsindoors.core.MPDisplayRule;
 import com.mapsindoors.core.MPIconPlacement;
 import com.mapsindoors.core.MPIconSize;
+import com.mapsindoors.core.MPLabelGraphic;
 import com.mapsindoors.core.MPLabelType;
 import com.mapsindoors.core.MPSolutionDisplayRule;
 import com.mapsindoors.core.MapsIndoors;
@@ -979,6 +982,9 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
                     case 1:
                         labelType = MPLabelType.FLAT;
                         break;
+                    case 2:
+                        labelType = MPLabelType.GRAPHIC;
+                        break;
                     default:
                         labelType = MPLabelType.FLOATING;
                         break;
@@ -1153,6 +1159,30 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
                 displayRule.setLabelStyleBearing(bearing.floatValue());
             }
             promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setLabelStyleGraphic(String displayRuleId, String graphic, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            MPLabelGraphic labelGraphic = gson.fromJson(graphic, MPLabelGraphic.class);
+            displayRule.setLabelStyleGraphic(labelGraphic);
+            Log.i("timtest", "i did a thing");
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getLabelStyleGraphic(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            String labelGraphicString = gson.toJson(displayRule.getLabelStyleGraphic());
+            promise.resolve(labelGraphicString);
         } else {
             reject(promise, displayRuleId);
         }
@@ -1466,6 +1496,148 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
                     break;
             }
             displayRule.setBadgePosition(badgePosition);
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getModel3DModel(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getModel3DModel());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setModel3DModel(String displayRuleId, String model, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            displayRule.setModel3DModel(model);
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getModel3DRotationX(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getModel3DRotationX());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setModel3DRotationX(String displayRuleId, Double rotationX, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (rotationX == -1) {
+                displayRule.setModel3DRotationX(null);
+            }else {
+                displayRule.setModel3DRotationX(rotationX.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getModel3DRotationY(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getModel3DRotationY());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setModel3DRotationY(String displayRuleId, Double rotationY, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (rotationY == -1) {
+                displayRule.setModel3DRotationY(null);
+            }else {
+                displayRule.setModel3DRotationY(rotationY.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getModel3DRotationZ(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getModel3DRotationZ());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setModel3DRotationZ(String displayRuleId, Double rotationZ, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (rotationZ == -1) {
+                displayRule.setModel3DRotationZ(null);
+            }else {
+                displayRule.setModel3DRotationZ(rotationZ.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void getModel3DScale(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getModel3DScale());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setModel3DScale(String displayRuleId, Double scale, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (scale == -1) {
+                displayRule.setModel3DScale(null);
+            }else {
+                displayRule.setModel3DScale(scale.floatValue());
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void isModel3DVisible(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.isModel3DVisible());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setModel3DVisible(String displayRuleId, String visible, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            displayRule.setModel3DVisible(Boolean.valueOf(visible));
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);

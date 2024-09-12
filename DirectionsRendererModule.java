@@ -1,10 +1,15 @@
 package com.mapsindoorsrn.core;
 
+import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.os.Handler;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.FutureTarget;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -12,22 +17,36 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
+import com.facebook.react.bridge.ReadableArray;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.mapsindoors.core.MPCameraViewFitMode;
 import com.mapsindoors.core.MPDirectionsRenderer;
 import com.mapsindoors.core.MPRoute;
+import com.mapsindoors.core.MPRouteStopIconProvider;
 import com.mapsindoors.core.MapControl;
 import com.mapsindoors.core.OnMapControlReadyListener;
 import com.mapsindoors.core.errors.MIError;
 import com.mapsindoors.core.errors.MIErrorEnum;
 import com.mapsindoors.core.errors.MapsIndoorsException;
+import com.mapsindoorsrn.core.models.BitmapStopIconConfig;
 import com.mapsindoorsrn.core.models.MPError;
+import com.mapsindoorsrn.core.models.RouteStopIconConfigModel;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class DirectionsRendererModule extends ReactContextBaseJavaModule implements OnMapControlReadyListener {
     private MapControl mMapControl;
     private MPDirectionsRenderer mRenderer;
     private final ReactApplicationContext mCtx;
+    private final Gson gson = new Gson();
+
 
     public DirectionsRendererModule(@NonNull ReactApplicationContext reactContext, MapControlModule mapControl) {
         super(reactContext);
@@ -143,6 +162,9 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
                 case 2:
                     mode = MPCameraViewFitMode.START_TO_END_ALIGNED;
                     break;
+                case 3:
+                    mode = MPCameraViewFitMode.NONE;
+                    break;
                 default:
                     mode = null;
             }
@@ -189,11 +211,86 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
     }
 
     @ReactMethod
-    public void setRoute(String routeString, final Promise promise) {
+    public void setRoute(String routeString, String icons, int legIndex, final Promise promise) {
         if (mRenderer != null) {
+            Context ctx = mCtx.getApplicationContext();
             MPRoute route = new Gson().fromJson(routeString, MPRoute.class);
-            mRenderer.setRoute(route);
-            promise.resolve(null);
+            if (icons != null) {
+                new Handler().post(()-> {
+                    HashMap<Integer, String> iconsMap = gson.fromJson(icons, new TypeToken<HashMap<Integer, String>>(){}.getType());
+                    HashMap<Integer, MPRouteStopIconProvider> iconConfigs = new HashMap<>();
+                    for (Map.Entry<Integer, String> mapEntry : iconsMap.entrySet()) {
+                        String icon = mapEntry.getValue();
+                        if (icon == null) {
+                            iconConfigs.put(mapEntry.getKey(), null);
+                        } else if (isUrl(icon)) {
+                            FutureTarget<Bitmap> futureTarget = Glide.with(ctx).asBitmap().load(icon).submit();
+                            try {
+                                BitmapStopIconConfig iconConfig = new BitmapStopIconConfig(futureTarget.get());
+                                iconConfigs.put(mapEntry.getKey(), iconConfig);
+                            } catch (Exception e) {
+                                promise.reject("something went wrong loading the image for " + icon, e);
+                                return;
+                            }
+                        }else {
+                            String json = icon.substring(0, icon.length() - 1);
+                            RouteStopIconConfigModel iconConfig = gson.fromJson(json, RouteStopIconConfigModel.class);
+                            iconConfigs.put(mapEntry.getKey(), iconConfig.toMPRouteStopIconConfig(ctx));
+                        }
+                    }
+
+                    mRenderer.setRoute(route, iconConfigs);
+                    if (legIndex != 0) {
+                        try {
+                            mRenderer.selectLegIndex(legIndex);
+                        } catch (IllegalStateException e) {
+                            promise.reject(e.getMessage(), new Gson().toJson(MPError.fromMIError(new MIError(MIErrorEnum.ROUTING_UNKNOWN_ERROR, e.getMessage()))));
+                            return;
+                        }   
+                    }
+                    
+                    promise.resolve(null);
+                });
+            }else {
+                mRenderer.setRoute(route);
+                promise.resolve(null);
+            }
+        } else {
+            rejectPromise(promise);
+        }
+    }
+
+    @ReactMethod
+    public void setDefaultRouteStopIcon(String iconString, final Promise promise) {
+        if (mRenderer != null) {
+            //Create icon from url
+            if (iconString != null) {
+                //Handle icon
+                new Handler().post(()-> {
+                    Context ctx = mCtx.getApplicationContext();
+                    if (iconString == null || iconString.equals("null") || iconString.isEmpty()) {
+                          mRenderer.setDefaultRouteStopIconConfig(null);
+                          promise.resolve(null);
+                     } else if (isUrl(iconString)) {
+                          FutureTarget<Bitmap> futureTarget = Glide.with(ctx).asBitmap().load(iconString).submit();
+                          try {
+                            BitmapStopIconConfig iconConfig = new BitmapStopIconConfig(futureTarget.get());
+                            mRenderer.setDefaultRouteStopIconConfig(iconConfig);
+                            promise.resolve(null);
+                          } catch (Exception e) {
+                            promise.reject("something went wrong loading the image", e);
+                          }
+                     } else {
+                        String json = iconString.substring(0, iconString.length() - 1);
+                        RouteStopIconConfigModel iconConfig = gson.fromJson(json, RouteStopIconConfigModel.class);
+                        mRenderer.setDefaultRouteStopIconConfig(iconConfig.toMPRouteStopIconConfig(ctx));
+                        promise.resolve(null);
+                    }
+                });
+            }else {
+                mRenderer.setDefaultRouteStopIconConfig(null);
+                promise.resolve(null);
+            }
         } else {
             rejectPromise(promise);
         }
@@ -214,5 +311,12 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
     @ReactMethod
     public void removeListeners(Integer count) {
         // we are handling listeners ourselves
+    }
+
+    private boolean isUrl(String url) {
+        String regex = "^(http|https)://.*$";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(url);
+        return matcher.matches();
     }
 }
