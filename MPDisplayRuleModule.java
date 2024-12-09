@@ -1,7 +1,5 @@
 package com.mapsindoorsrn.core;
 
-import android.util.Log;
-
 import androidx.annotation.NonNull;
 
 import com.facebook.react.bridge.Promise;
@@ -12,6 +10,7 @@ import com.google.gson.Gson;
 import com.mapsindoors.core.MPBadgePosition;
 import com.mapsindoors.core.MPDisplayRule;
 import com.mapsindoors.core.MPIconPlacement;
+import com.mapsindoors.core.MPLabelPosition;
 import com.mapsindoors.core.MPIconSize;
 import com.mapsindoors.core.MPLabelGraphic;
 import com.mapsindoors.core.MPLabelType;
@@ -1165,12 +1164,54 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void getLabelStylePosition(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getLabelStylePosition() != null ? displayRule.getLabelStylePosition().ordinal() : null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setLabelStylePosition(String displayRuleId, Integer position, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (position == -1) {
+                displayRule.setLabelStylePosition(null);
+            }else {
+                MPLabelPosition labelPosition;
+                switch (position) {
+                    case 0:
+                        labelPosition = MPLabelPosition.TOP;
+                        break;
+                    case 1:
+                        labelPosition = MPLabelPosition.BOTTOM;
+                        break;
+                    case 2:
+                        labelPosition = MPLabelPosition.LEFT;
+                        break;
+                    case 3:
+                        labelPosition = MPLabelPosition.RIGHT;
+                        break;
+                    default:
+                        labelPosition = MPLabelPosition.BOTTOM;
+                        break;
+                }
+                displayRule.setLabelStylePosition(labelPosition);
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
     public void setLabelStyleGraphic(String displayRuleId, String graphic, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
             MPLabelGraphic labelGraphic = gson.fromJson(graphic, MPLabelGraphic.class);
             displayRule.setLabelStyleGraphic(labelGraphic);
-            Log.i("timtest", "i did a thing");
             promise.resolve(null);
         } else {
             reject(promise, displayRuleId);
