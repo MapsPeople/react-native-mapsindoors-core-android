@@ -211,4 +211,17 @@ public class UtilsModule extends ReactContextBaseJavaModule {
 
         promise.resolve(null);
     }
+
+    @ReactMethod
+    public void setAutomatedZoomLimit(Double zoomLimit, final Promise promise) {
+        MPSolution solution = MapsIndoors.getSolution();
+        if (solution != null) {
+            if (zoomLimit == -1) {
+                solution.getConfig().setAutomatedZoomLimit(null);
+            }else {
+                solution.getConfig().setAutomatedZoomLimit(zoomLimit);
+            }
+        }
+        promise.resolve(null);
+    }
 }
