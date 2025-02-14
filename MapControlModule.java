@@ -172,26 +172,42 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     }
 
     @ReactMethod
-    public void goTo(String entityString, String entityType, final Promise promise) {
+    public void goTo(String entityString, String entityType, Double maxZoom, final Promise promise) {
         switch (entityType) {
             case "MPLocation": {
                 MPLocation location = gson.fromJson(entityString, Location.class).toMPLocation();
-                mCtx.runOnUiQueueThread(() -> mMapControl.goTo(location));
+                if (maxZoom != -999) {
+                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(location, maxZoom));
+                }else {
+                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(location));
+                }
                 break;
             }
             case "MPFloor": {
                 MPFloor floor = gson.fromJson(entityString, MPFloor.class);
-                mCtx.runOnUiQueueThread(() -> mMapControl.goTo(floor));
+                if (maxZoom != -999) {
+                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(floor, maxZoom));
+                }else {
+                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(floor));
+                }
                 break;
             }
             case "MPBuilding": {
                 MPBuilding building = gson.fromJson(entityString, MPBuilding.class);
-                mCtx.runOnUiQueueThread(() -> mMapControl.goTo(building));
+                if (maxZoom != -999) {
+                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(building, maxZoom));
+                }else {
+                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(building));
+                }
                 break;
             }
             case "MPVenue":  {
                 MPVenue venue = gson.fromJson(entityString, MPVenue.class);
-                mCtx.runOnUiQueueThread(()-> mMapControl.goTo(venue));
+                if (maxZoom != -999) {
+                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(venue, maxZoom));
+                }else {
+                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(venue));
+                }
                 break;
             }
         }
