@@ -12,6 +12,10 @@ import com.mapsindoors.core.MPBuilding;
 import com.mapsindoors.core.MPBuildingCollection;
 import com.mapsindoors.core.MPCategory;
 import com.mapsindoors.core.MPCategoryCollection;
+import com.mapsindoors.core.MPDataSetCache;
+import com.mapsindoors.core.MPDataSetCacheManager;
+import com.mapsindoors.core.MPDataSetCacheScope;
+import com.mapsindoors.core.MPDataSetManagerStatus;
 import com.mapsindoors.core.MPDisplayRule;
 import com.mapsindoors.core.MPFilter;
 import com.mapsindoors.core.MPLocation;
@@ -32,6 +36,7 @@ import com.mapsindoorsrn.core.models.PositionResult;
 import com.mapsindoorsrn.core.models.Query;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class MapsIndoorsModule extends ReactContextBaseJavaModule {
@@ -379,5 +384,27 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
         } else {
             promise.resolve(null);
         }
+    }
+
+    @ReactMethod
+    public void cacheData(String apiKey, Promise promise) {
+        if (!MPDataSetCacheManager.isInitialized()) {
+            MPDataSetCacheManager.initialize(reactContext);
+        }
+        MPDataSetCache cache = MPDataSetCacheManager.getInstance().getDataSetByID(apiKey);
+        if (cache == null) {
+            cache = MPDataSetCacheManager.getInstance().addDataSetWithCachingScope(apiKey, MPDataSetCacheScope.FULL);
+        }else {
+            cache.setScope(MPDataSetCacheScope.FULL);
+        }
+        MPDataSetCache finalCache = cache;
+        MPDataSetCacheManager.getInstance().addMPDataSetCacheSyncListener(((mpDataSetCache, i) -> {
+            if (i == MPDataSetManagerStatus.SYNC_FINISHED && finalCache.getSolutionId().equals(mpDataSetCache.getSolutionId())) {
+                promise.resolve(true);
+            } else if (i == MPDataSetManagerStatus.SYNC_FAILED && finalCache.getSolutionId().equals(mpDataSetCache.getSolutionId())) {
+                promise.resolve(false);
+            }
+        }));
+        MPDataSetCacheManager.getInstance().synchronizeDataSets(Collections.singletonList(cache));
     }
 }
