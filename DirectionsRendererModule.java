@@ -30,6 +30,7 @@ import com.mapsindoors.core.errors.MIError;
 import com.mapsindoors.core.errors.MIErrorEnum;
 import com.mapsindoors.core.errors.MapsIndoorsException;
 import com.mapsindoorsrn.core.models.BitmapStopIconConfig;
+import com.facebook.react.module.annotations.ReactModule;
 import com.mapsindoorsrn.core.models.MPError;
 import com.mapsindoorsrn.core.models.RouteStopIconConfigModel;
 
@@ -41,7 +42,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
+@ReactModule(name = DirectionsRendererModule.NAME)
 public class DirectionsRendererModule extends ReactContextBaseJavaModule implements OnMapControlReadyListener {
+    public static final String NAME = "DirectionsRenderer";
+
     private MapControl mMapControl;
     private MPDirectionsRenderer mRenderer;
     private final ReactApplicationContext mCtx;
@@ -57,7 +61,7 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
     @NonNull
     @Override
     public String getName() {
-        return "DirectionsRenderer";
+        return NAME;
     }
 
     private void rejectPromise(Promise promise) {

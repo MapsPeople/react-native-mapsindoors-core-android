@@ -6,6 +6,7 @@ import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.module.annotations.ReactModule;
 import com.google.gson.Gson;
 import com.mapsindoors.core.MPBadgePosition;
 import com.mapsindoors.core.MPDisplayRule;
@@ -20,7 +21,10 @@ import com.mapsindoors.core.errors.MIError;
 import com.mapsindoors.core.errors.MIErrorEnum;
 import com.mapsindoorsrn.core.models.MPError;
 
+@ReactModule(name = MPDisplayRuleModule.NAME)
 public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
+    public static final String NAME = "DisplayRule";
+
     private final Gson gson = new Gson();
 
     public MPDisplayRuleModule(@NonNull ReactApplicationContext reactContext) {
@@ -30,7 +34,7 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     @NonNull
     @Override
     public String getName() {
-        return "DisplayRule";
+        return NAME;
     }
 
     private void reject(Promise promise, String id) {
