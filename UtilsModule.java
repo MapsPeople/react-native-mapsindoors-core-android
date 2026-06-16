@@ -6,6 +6,7 @@ import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.module.annotations.ReactModule;
 import com.google.gson.Gson;
 import com.mapsindoors.core.MPCollisionHandling;
 import com.mapsindoors.core.MPGeometry;
@@ -25,7 +26,9 @@ import com.mapsindoorsrn.core.models.MPError;
 
 import java.util.Locale;
 
+@ReactModule(name = UtilsModule.NAME)
 public class UtilsModule extends ReactContextBaseJavaModule {
+    public static final String NAME = "UtilsModule";
 
     private final Gson gson = new Gson();
 
@@ -36,7 +39,7 @@ public class UtilsModule extends ReactContextBaseJavaModule {
     @NonNull
     @Override
     public String getName() {
-        return "UtilsModule";
+        return NAME;
     }
 
     private void reject(Promise promise, MIError error) {
