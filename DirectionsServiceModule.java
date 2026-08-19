@@ -9,6 +9,7 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.ReadableArray;
+import com.facebook.react.module.annotations.ReactModule;
 import com.google.gson.Gson;
 import com.mapsindoors.core.MPDirectionsService;
 import com.mapsindoors.core.MPPoint;
@@ -20,7 +21,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
+@ReactModule(name = DirectionsServiceModule.NAME)
 public class DirectionsServiceModule extends ReactContextBaseJavaModule {
+    public static final String NAME = "DirectionsService";
 
     private HashMap<String, MPDirectionsService> serviceMap = new HashMap<>();
     private static final String NO_DS = "This DirectionsService is not available";
@@ -31,7 +34,7 @@ public class DirectionsServiceModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void create(final Promise promise) {
+    public void createService(final Promise promise) {
         MPDirectionsService service = new MPDirectionsService();
         String uuid = UUID.randomUUID().toString();
         serviceMap.put(uuid, service);
@@ -161,6 +164,6 @@ public class DirectionsServiceModule extends ReactContextBaseJavaModule {
     @NonNull
     @Override
     public String getName() {
-        return "DirectionsService";
+        return NAME;
     }
 }

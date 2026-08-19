@@ -42,6 +42,7 @@ import com.mapsindoors.core.models.MPMapStyle;
 import com.mapsindoorsrn.core.models.Filter;
 import com.mapsindoorsrn.core.models.Location;
 import com.mapsindoorsrn.core.models.MPCameraUpdate;
+import com.facebook.react.module.annotations.ReactModule;
 import com.mapsindoorsrn.core.models.MPError;
 
 import java.util.ArrayList;
@@ -49,7 +50,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@ReactModule(name = MapControlModule.NAME)
 public class MapControlModule extends ReactContextBaseJavaModule implements MPCameraEventListener, OnFloorUpdateListener, MPFloorSelectorInterface {
+    public static final String NAME = "MapControlModule";
+
     private RCMapView mMapView;
     private final Gson gson = new Gson();
     private MapControl mMapControl;
@@ -64,7 +68,7 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     @NonNull
     @Override
     public String getName() {
-        return "MapControlModule";
+        return NAME;
     }
 
     private void reject(Promise promise, MIError error) {

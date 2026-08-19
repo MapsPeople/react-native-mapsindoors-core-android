@@ -6,6 +6,7 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableArray;
+import com.facebook.react.module.annotations.ReactModule;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.mapsindoors.core.MPBuilding;
@@ -39,7 +40,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+@ReactModule(name = MapsIndoorsModule.NAME)
 public class MapsIndoorsModule extends ReactContextBaseJavaModule {
+    public static final String NAME = "MapsIndoorsModule";
 
     private final ReactApplicationContext reactContext;
     private final Gson gson = new Gson();
@@ -53,7 +56,7 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
 
     @Override
     public String getName() {
-        return "MapsIndoorsModule";
+        return NAME;
     }
 
     private void reject(Promise promise, MIError error) {
