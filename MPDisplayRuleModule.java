@@ -921,6 +921,39 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void getIconZoomFactor(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            promise.resolve(displayRule.getIconZoomFactor());
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    /**
+     * Sets the factor the icon grows by across the solution's icon-scale zoom band.
+     *
+     * <p>-1, or null, clears the override and lets the factor inherit again, matching the sentinel
+     * {@link #setIconScale} already uses. Any other value is passed straight to
+     * {@link MPDisplayRule#setIconZoomFactor(Double)}, which rejects and logs anything outside the
+     * contract's finite {@code > 0 && <= 4} rather than clamping it.</p>
+     */
+    @ReactMethod
+    public void setIconZoomFactor(String displayRuleId, Double zoomFactor, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            if (zoomFactor == null || zoomFactor == -1) {
+                displayRule.setIconZoomFactor(null);
+            }else {
+                displayRule.setIconZoomFactor(zoomFactor);
+            }
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
     public void getIconPlacement(String displayRuleId, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
