@@ -28,7 +28,7 @@ public class DirectionsServiceModule extends ReactContextBaseJavaModule {
     private HashMap<String, MPDirectionsService> serviceMap = new HashMap<>();
     private static final String NO_DS = "This DirectionsService is not available";
 
-    private final Gson gson = new Gson();
+    private final Gson gson = RnGson.create();
     public DirectionsServiceModule(@NonNull ReactApplicationContext reactContext) {
         super(reactContext);
     }
@@ -101,12 +101,21 @@ public class DirectionsServiceModule extends ReactContextBaseJavaModule {
         MPDirectionsService service = serviceMap.get(id);
         if (service != null) {
             service.setRouteResultListener((route, error) -> {
-                WritableMap map = Arguments.createMap();
-                if (route != null) {
-                    map.putString("route", gson.toJson(route));
-                }
-                if (error != null) {
-                    map.putString("error", gson.toJson(error));
+                // Delivered on the SDK's thread, outside React Native's try/catch, so an unhandled
+                // throw takes the host app down instead of failing this call (MS-3983). MIError
+                // carries an untyped tag, so the error branch is as exposed as the route branch.
+                final WritableMap map = Arguments.createMap();
+                try {
+                    if (route != null) {
+                        map.putString("route", gson.toJson(route));
+                    }
+                    if (error != null) {
+                        map.putString("error", gson.toJson(error));
+                    }
+                } catch (Exception | StackOverflowError t) {
+                    RnGson.rejectSerialisationFailure(promise, "DirectionsServiceError",
+                            "Could not serialise the route result: " + t);
+                    return;
                 }
                 promise.resolve(map);
             });

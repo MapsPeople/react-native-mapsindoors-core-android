@@ -30,7 +30,7 @@ import java.util.Locale;
 public class UtilsModule extends ReactContextBaseJavaModule {
     public static final String NAME = "UtilsModule";
 
-    private final Gson gson = new Gson();
+    private final Gson gson = RnGson.create();
 
     public UtilsModule(ReactApplicationContext reactApplicationContext) {
         super(reactApplicationContext);

@@ -22,6 +22,8 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.mapsindoors.core.MPCameraViewFitMode;
 import com.mapsindoors.core.MPDirectionsRenderer;
+import com.mapsindoors.core.MPDirectionsRendererConfig;
+import com.mapsindoors.core.MPDirectionsRendererOptions;
 import com.mapsindoors.core.MPRoute;
 import com.mapsindoors.core.MPRouteStopIconProvider;
 import com.mapsindoors.core.MapControl;
@@ -31,6 +33,7 @@ import com.mapsindoors.core.errors.MIErrorEnum;
 import com.mapsindoors.core.errors.MapsIndoorsException;
 import com.mapsindoorsrn.core.models.BitmapStopIconConfig;
 import com.facebook.react.module.annotations.ReactModule;
+import com.mapsindoorsrn.core.models.DirectionsRendererOptionsModel;
 import com.mapsindoorsrn.core.models.MPError;
 import com.mapsindoorsrn.core.models.RouteStopIconConfigModel;
 
@@ -48,8 +51,16 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
 
     private MapControl mMapControl;
     private MPDirectionsRenderer mRenderer;
+    /**
+     * The renderer's solution served styling, snapshotted before the first runtime override is
+     * applied. Options the app leaves out resolve against this, so they stay inherited from the
+     * solution instead of being reset - and instead of accumulating the previous override, which
+     * setting a fresh set of options is meant to clear.
+     */
+    private MPDirectionsRendererConfig mSolutionConfig;
+    private boolean mSolutionConfigCaptured;
     private final ReactApplicationContext mCtx;
-    private final Gson gson = new Gson();
+    private final Gson gson = RnGson.create();
 
 
     public DirectionsRendererModule(@NonNull ReactApplicationContext reactContext, MapControlModule mapControl) {
@@ -113,7 +124,7 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
             try {
                 mRenderer.selectLegIndex(legIndex);
             } catch (IllegalStateException e) {
-                promise.reject(e.getMessage(), new Gson().toJson(MPError.fromMIError(new MIError(MIErrorEnum.ROUTING_UNKNOWN_ERROR, e.getMessage()))));
+                promise.reject(e.getMessage(), gson.toJson(MPError.fromMIError(new MIError(MIErrorEnum.ROUTING_UNKNOWN_ERROR, e.getMessage()))));
                 return;
             }
             promise.resolve(null);
@@ -215,45 +226,115 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
     }
 
     @ReactMethod
+    public void setOptions(String optionsString, final Promise promise) {
+        if (mRenderer != null) {
+            DirectionsRendererOptionsModel options;
+            try {
+                options = gson.fromJson(optionsString, DirectionsRendererOptionsModel.class);
+            } catch (Exception e) {
+                promise.reject("Options could not be parsed", e);
+                return;
+            }
+            if (options == null) {
+                promise.reject("Options could not be parsed", new MapsIndoorsException("Options could not be parsed"));
+                return;
+            }
+            if (!mSolutionConfigCaptured) {
+                mSolutionConfig = mRenderer.getConfig();
+                mSolutionConfigCaptured = true;
+            }
+            try {
+                // The config carries the styling the renderer resolves against the solution config,
+                // the options the polyline styling and animation timing. Both are built before
+                // either is applied, because parsing a colour can throw - applying the config first
+                // would leave the route restyled by a call the promise reports as failed.
+                MPDirectionsRendererConfig config = options.toMPDirectionsRendererConfig(mSolutionConfig);
+                MPDirectionsRendererOptions rendererOptions = options.toMPDirectionsRendererOptions();
+                mRenderer.setConfig(config);
+                mRenderer.setOptions(rendererOptions);
+            } catch (IllegalArgumentException e) {
+                promise.reject(e);
+                return;
+            }
+            promise.resolve(null);
+        } else {
+            rejectPromise(promise);
+        }
+    }
+
+    @ReactMethod
+    public void getOptions(final Promise promise) {
+        if (mRenderer != null) {
+            promise.resolve(gson.toJson(DirectionsRendererOptionsModel.from(mRenderer.getOptions(), mRenderer.getConfig())));
+        } else {
+            rejectPromise(promise);
+        }
+    }
+
+    @ReactMethod
+    public void finishGuidance(double usagePercentage, final Promise promise) {
+        if (mRenderer != null) {
+            // A negative value means the app did not supply a figure, so the SDK derives it from
+            // the route's own progress.
+            if (usagePercentage < 0) {
+                mRenderer.finishGuidance();
+            } else {
+                mRenderer.finishGuidance(usagePercentage);
+            }
+            promise.resolve(null);
+        } else {
+            rejectPromise(promise);
+        }
+    }
+
+    @ReactMethod
     public void setRoute(String routeString, String icons, int legIndex, final Promise promise) {
         if (mRenderer != null) {
             Context ctx = mCtx.getApplicationContext();
-            MPRoute route = new Gson().fromJson(routeString, MPRoute.class);
+            MPRoute route = gson.fromJson(routeString, MPRoute.class);
             if (icons != null) {
                 new Handler().post(()-> {
-                    HashMap<Integer, String> iconsMap = gson.fromJson(icons, new TypeToken<HashMap<Integer, String>>(){}.getType());
-                    HashMap<Integer, MPRouteStopIconProvider> iconConfigs = new HashMap<>();
-                    for (Map.Entry<Integer, String> mapEntry : iconsMap.entrySet()) {
-                        String icon = mapEntry.getValue();
-                        if (icon == null) {
-                            iconConfigs.put(mapEntry.getKey(), null);
-                        } else if (isUrl(icon)) {
-                            FutureTarget<Bitmap> futureTarget = Glide.with(ctx).asBitmap().load(icon).submit();
-                            try {
-                                BitmapStopIconConfig iconConfig = new BitmapStopIconConfig(futureTarget.get());
-                                iconConfigs.put(mapEntry.getKey(), iconConfig);
-                            } catch (Exception e) {
-                                promise.reject("something went wrong loading the image for " + icon, e);
-                                return;
+                    // Posted to the main looper, so this body is off React Native's stack: a throw
+                    // here takes the host app down instead of rejecting this call (MS-3983). Error
+                    // handling matches the guards in MapsIndoorsModule.
+                    try {
+                        HashMap<Integer, String> iconsMap = gson.fromJson(icons, new TypeToken<HashMap<Integer, String>>(){}.getType());
+                        HashMap<Integer, MPRouteStopIconProvider> iconConfigs = new HashMap<>();
+                        for (Map.Entry<Integer, String> mapEntry : iconsMap.entrySet()) {
+                            String icon = mapEntry.getValue();
+                            if (icon == null) {
+                                iconConfigs.put(mapEntry.getKey(), null);
+                            } else if (isUrl(icon)) {
+                                FutureTarget<Bitmap> futureTarget = Glide.with(ctx).asBitmap().load(icon).submit();
+                                try {
+                                    BitmapStopIconConfig iconConfig = new BitmapStopIconConfig(futureTarget.get());
+                                    iconConfigs.put(mapEntry.getKey(), iconConfig);
+                                } catch (Exception e) {
+                                    promise.reject("something went wrong loading the image for " + icon, e);
+                                    return;
+                                }
+                            }else {
+                                String json = icon.substring(0, icon.length() - 1);
+                                RouteStopIconConfigModel iconConfig = gson.fromJson(json, RouteStopIconConfigModel.class);
+                                iconConfigs.put(mapEntry.getKey(), iconConfig.toMPRouteStopIconConfig(ctx));
                             }
-                        }else {
-                            String json = icon.substring(0, icon.length() - 1);
-                            RouteStopIconConfigModel iconConfig = gson.fromJson(json, RouteStopIconConfigModel.class);
-                            iconConfigs.put(mapEntry.getKey(), iconConfig.toMPRouteStopIconConfig(ctx));
                         }
-                    }
 
-                    mRenderer.setRoute(route, iconConfigs);
-                    if (legIndex != 0) {
-                        try {
-                            mRenderer.selectLegIndex(legIndex);
-                        } catch (IllegalStateException e) {
-                            promise.reject(e.getMessage(), new Gson().toJson(MPError.fromMIError(new MIError(MIErrorEnum.ROUTING_UNKNOWN_ERROR, e.getMessage()))));
-                            return;
-                        }   
-                    }
+                        mRenderer.setRoute(route, iconConfigs);
+                        if (legIndex != 0) {
+                            try {
+                                mRenderer.selectLegIndex(legIndex);
+                            } catch (IllegalStateException e) {
+                                promise.reject(e.getMessage(), gson.toJson(MPError.fromMIError(new MIError(MIErrorEnum.ROUTING_UNKNOWN_ERROR, e.getMessage()))));
+                                return;
+                            }   
+                        }
                     
-                    promise.resolve(null);
+                        promise.resolve(null);
+                    } catch (Exception | StackOverflowError t) {
+                        RnGson.rejectSerialisationFailure(promise, "DirectionsRendererError",
+                                "Could not set the route: " + t);
+                    }
                 });
             }else {
                 mRenderer.setRoute(route);
@@ -271,24 +352,32 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
             if (iconString != null) {
                 //Handle icon
                 new Handler().post(()-> {
-                    Context ctx = mCtx.getApplicationContext();
-                    if (iconString == null || iconString.equals("null") || iconString.isEmpty()) {
-                          mRenderer.setDefaultRouteStopIconConfig(null);
-                          promise.resolve(null);
-                     } else if (isUrl(iconString)) {
-                          FutureTarget<Bitmap> futureTarget = Glide.with(ctx).asBitmap().load(iconString).submit();
-                          try {
-                            BitmapStopIconConfig iconConfig = new BitmapStopIconConfig(futureTarget.get());
-                            mRenderer.setDefaultRouteStopIconConfig(iconConfig);
+                    // Posted to the main looper, so this body is off React Native's stack: a throw
+                    // here takes the host app down instead of rejecting this call (MS-3983). Error
+                    // handling matches the guards in MapsIndoorsModule.
+                    try {
+                        Context ctx = mCtx.getApplicationContext();
+                        if (iconString == null || iconString.equals("null") || iconString.isEmpty()) {
+                              mRenderer.setDefaultRouteStopIconConfig(null);
+                              promise.resolve(null);
+                         } else if (isUrl(iconString)) {
+                              FutureTarget<Bitmap> futureTarget = Glide.with(ctx).asBitmap().load(iconString).submit();
+                              try {
+                                BitmapStopIconConfig iconConfig = new BitmapStopIconConfig(futureTarget.get());
+                                mRenderer.setDefaultRouteStopIconConfig(iconConfig);
+                                promise.resolve(null);
+                              } catch (Exception e) {
+                                promise.reject("something went wrong loading the image", e);
+                              }
+                         } else {
+                            String json = iconString.substring(0, iconString.length() - 1);
+                            RouteStopIconConfigModel iconConfig = gson.fromJson(json, RouteStopIconConfigModel.class);
+                            mRenderer.setDefaultRouteStopIconConfig(iconConfig.toMPRouteStopIconConfig(ctx));
                             promise.resolve(null);
-                          } catch (Exception e) {
-                            promise.reject("something went wrong loading the image", e);
-                          }
-                     } else {
-                        String json = iconString.substring(0, iconString.length() - 1);
-                        RouteStopIconConfigModel iconConfig = gson.fromJson(json, RouteStopIconConfigModel.class);
-                        mRenderer.setDefaultRouteStopIconConfig(iconConfig.toMPRouteStopIconConfig(ctx));
-                        promise.resolve(null);
+                        }
+                    } catch (Exception | StackOverflowError t) {
+                        RnGson.rejectSerialisationFailure(promise, "DirectionsRendererError",
+                                "Could not set the default route stop icon: " + t);
                     }
                 });
             }else {
@@ -305,6 +394,8 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
         if (mapControl != null) {
             mMapControl = mapControl;
             mRenderer = new MPDirectionsRenderer(mMapControl);
+            mSolutionConfig = null;
+            mSolutionConfigCaptured = false;
         }
     }
 

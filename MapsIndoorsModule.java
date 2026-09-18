@@ -1,14 +1,19 @@
 package com.mapsindoorsrn.core;
 
+import androidx.annotation.Nullable;
+
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableArray;
+import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.module.annotations.ReactModule;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.mapsindoors.core.MPBaseMapCacheRegionListener;
 import com.mapsindoors.core.MPBuilding;
 import com.mapsindoors.core.MPBuildingCollection;
 import com.mapsindoors.core.MPCategory;
@@ -29,6 +34,7 @@ import com.mapsindoors.core.MPVenue;
 import com.mapsindoors.core.MPVenueCollection;
 import com.mapsindoors.core.MapsIndoors;
 import com.mapsindoors.core.errors.MIError;
+import com.mapsindoors.core.models.MPIMapProviderBaseMapCache;
 import com.mapsindoors.core.models.MPMapStyle;
 import com.mapsindoorsrn.core.models.Filter;
 import com.mapsindoorsrn.core.models.MPError;
@@ -45,13 +51,24 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
     public static final String NAME = "MapsIndoorsModule";
 
     private final ReactApplicationContext reactContext;
-    private final Gson gson = new Gson();
+    private final Gson gson = RnGson.create();
 
     private PositionProvider positionProvider;
 
     public MapsIndoorsModule(ReactApplicationContext reactContext) {
         super(reactContext);
         this.reactContext = reactContext;
+
+        // Initialized here rather than lazily inside the caching methods, because MPTileProvider asks
+        // MPDataSetCacheManager whether a solution has offline tiles when the map builds its floor-tile
+        // overlay - and getInstance() throws outright when nothing has initialized it. sIsInitialized is
+        // static, so it is false again on every cold start: an app that cached tiles in an earlier run
+        // and then launches offline would build its tile overlay against the network URL and render no
+        // MapsIndoors tiles at all. Doing it in the constructor puts it before any map can exist, and
+        // costs a file-path setup - the datasets manifest is only read on first getInstance().
+        if (!MPDataSetCacheManager.isInitialized()) {
+            MPDataSetCacheManager.initialize(reactContext);
+        }
     }
 
     @Override
@@ -59,8 +76,26 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
         return NAME;
     }
 
+    /**
+     * Rejects with the SDK's error, serialised.
+     *
+     * Most callers are SDK callbacks, off React Native's stack, where an unhandled throw takes the
+     * host app down rather than failing the call. {@code MPError} carries {@code MIError.tag},
+     * which is a bare {@code Object}, so this is the same reflection hazard the rest of the module
+     * guards - and the one path where a throw would land when the call has already failed
+     * (MS-3983). A failure to serialise the error still has to reach the caller, so it falls back
+     * to the Gson-free payload rather than being dropped.
+     */
     private void reject(Promise promise, MIError error) {
-        promise.reject("MapsIndoorsError", gson.toJson(MPError.fromMIError(error)));
+        final String errorString;
+        try {
+            errorString = gson.toJson(MPError.fromMIError(error));
+        } catch (Exception | StackOverflowError t) {
+            RnGson.rejectSerialisationFailure(promise, "MapsIndoorsError",
+                    "Could not serialise error " + (error != null ? error.code : "null") + ": " + t);
+            return;
+        }
+        promise.reject("MapsIndoorsError", errorString);
     }
 
     @ReactMethod
@@ -152,7 +187,7 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
             String locationsString = gson.toJson(locations);
             promise.resolve(locationsString);
         } else {
-            reject(promise, new MIError(MIError.UNKNOWN_ERROR, "Cannot fetch categories, try waiting until MapsIndoors is Ready"));
+            reject(promise, new MIError(MIError.UNKNOWN_ERROR, "Cannot fetch locations, try waiting until MapsIndoors is Ready"));
         }
     }
 
@@ -180,7 +215,12 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void getDefaultLanguage(final Promise promise) {
-        promise.resolve(MapsIndoors.getDefaultLanguage());
+        String defaultLanguage = MapsIndoors.getDefaultLanguage();
+        if (defaultLanguage != null) {
+            promise.resolve(defaultLanguage);
+        } else {
+            reject(promise, new MIError(MIError.UNKNOWN_ERROR, "No default language is available, try waiting until MapsIndoors is Ready"));
+        }
     }
 
     @ReactMethod
@@ -220,8 +260,11 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void getSolution(final Promise promise) {
         MPSolution solution = MapsIndoors.getSolution();
-        String solutionString = solution != null ? gson.toJson(solution): null;
-        promise.resolve(solutionString);
+        if (solution != null) {
+            promise.resolve(gson.toJson(solution));
+        } else {
+            reject(promise, new MIError(MIError.UNKNOWN_ERROR, "No solution is available, try waiting until MapsIndoors is Ready"));
+        }
     }
 
     @ReactMethod
@@ -230,12 +273,29 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
         MPFilter mpFilter = gson.fromJson(filter, Filter.class).toMPFilter();
 
         MapsIndoors.getLocationsAsync(mpQuery, mpFilter, (list, miError) -> {
-            if (miError == null) {
-                String locationsString = gson.toJson(list);
-                promise.resolve(locationsString);
-            } else {
+            if (miError != null) {
                 reject(promise, miError);
+                return;
             }
+
+            // Serialising here runs on the SDK's thread, outside React Native's try/catch, so an
+            // unhandled throw takes the host app down instead of failing this call (MS-3983).
+            // StackOverflowError is named because it is the failure being guarded and it is an
+            // Error, not an Exception; OutOfMemoryError and the linkage Errors are left to
+            // propagate, since nothing here can recover from them.
+            //
+            // Only the serialisation goes inside the guard. A throw from resolve - an already
+            // settled promise, a torn-down bridge - would otherwise be answered by rejecting the
+            // same promise from the catch, which throws again on this thread, uncaught.
+            final String locationsString;
+            try {
+                locationsString = gson.toJson(list);
+            } catch (Exception | StackOverflowError t) {
+                RnGson.rejectSerialisationFailure(promise, "MapsIndoorsError",
+                        "Could not serialise the locations result: " + t);
+                return;
+            }
+            promise.resolve(locationsString);
         });
     }
 
@@ -347,7 +407,19 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void reverseGeoCode(String pointString, final Promise promise) {
         MPPoint point = gson.fromJson(pointString, MPPoint.class);
-        MapsIndoors.reverseGeoCode(point, mpGeoCodeResult -> promise.resolve(gson.toJson(mpGeoCodeResult)));
+        MapsIndoors.reverseGeoCode(point, mpGeoCodeResult -> {
+            // Not on React Native's stack either, and the same shape and Error handling - see
+            // getLocationsAsync.
+            final String geoCodeString;
+            try {
+                geoCodeString = gson.toJson(mpGeoCodeResult);
+            } catch (Exception | StackOverflowError t) {
+                RnGson.rejectSerialisationFailure(promise, "MapsIndoorsError",
+                        "Could not serialise the reverse-geocode result: " + t);
+                return;
+            }
+            promise.resolve(geoCodeString);
+        });
     }
 
     @ReactMethod
@@ -409,5 +481,122 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
             }
         }));
         MPDataSetCacheManager.getInstance().synchronizeDataSets(Collections.singletonList(cache));
+    }
+
+    @ReactMethod
+    public void isBaseMapCachingSupported(Promise promise) {
+        final MPIMapProviderBaseMapCache provider = BaseMapCacheProviders.ensureRegistered(reactContext);
+
+        // Resolved rather than rejected when nothing is registered: "can this app cache base-map tiles"
+        // has a true answer either way, and false is the useful one for a caller deciding whether to
+        // offer offline base maps at all.
+        promise.resolve(provider != null && provider.isBaseMapCachingSupported());
+    }
+
+    @ReactMethod
+    public void setBaseMapTilesEnabled(boolean enabled, String apiKey, Promise promise) {
+        // No ensureRegistered() here, unlike the two methods either side of it: flagging a dataset needs
+        // no provider, and synchronizeBaseMapTiles registers one before it needs it. The manager itself
+        // is already initialized by this module's constructor.
+        final MPDataSetCacheManager manager = MPDataSetCacheManager.getInstance();
+        final MPDataSetCache cache = manager.getDataSetByID(apiKey);
+
+        if (cache == null) {
+            // Managed from here on, with the same FULL scope cacheData() uses: there is nothing to flag
+            // otherwise, and base-map caching needs the dataset's venues on disk to know what to cache
+            // around.
+            if (manager.addDataSetWithCachingScope(apiKey, MPDataSetCacheScope.FULL, enabled) == null) {
+                // Reported rather than resolved: the flag is not set, so a later synchronizeBaseMapTiles
+                // would fail as BASEMAP_CACHE_NOT_REGISTERED or simply cache nothing, displaced from the
+                // cause. iOS rejects on the same call.
+                reject(promise, new MIError(MIError.UNKNOWN_ERROR, "Unable to manage dataset '" + apiKey + "'"));
+                return;
+            }
+        } else {
+            cache.setBaseMapTilesEnabled(enabled);
+        }
+
+        promise.resolve(null);
+    }
+
+    @ReactMethod
+    public void synchronizeBaseMapTiles(@Nullable ReadableArray apiKeys, Promise promise) {
+        BaseMapCacheProviders.ensureRegistered(reactContext);
+
+        final MPDataSetCacheManager manager = MPDataSetCacheManager.getInstance();
+        final List<MPDataSetCache> caches = new ArrayList<>();
+
+        if (apiKeys != null) {
+            for (int i = 0; i < apiKeys.size(); i++) {
+                final String apiKey = apiKeys.getString(i);
+                final MPDataSetCache cache = manager.getDataSetByID(apiKey);
+
+                if (cache == null) {
+                    // Rejected rather than skipped: an explicit list is an explicit instruction, and
+                    // silently caching nothing for a key the caller named is the harder failure to spot.
+                    reject(promise, new MIError(MIError.BASEMAP_CACHE_NOT_REGISTERED,
+                            "No dataset is managed for '" + apiKey + "', so base-map tiles cannot be cached for it"));
+                    return;
+                }
+
+                caches.add(cache);
+            }
+        }
+
+        final MPBaseMapCacheRegionListener listener = new MPBaseMapCacheRegionListener() {
+            @Override
+            public void onProgress(double fraction) {
+                // Guarded, unlike every other emitter in this module: those fire from map or UI
+                // callbacks, so a live React context is a given. This one fires from a background
+                // download owned by MPDataSetCacheManager - a static singleton - so it outlives a
+                // context teardown, and a Metro reload part-way through a multi-minute sync would
+                // otherwise call getJSModule against a bridge that is gone, once per tick.
+                if (!reactContext.hasActiveReactInstance()) {
+                    return;
+                }
+
+                final WritableMap params = Arguments.createMap();
+                params.putDouble("progress", fraction);
+                // Emitted unconditionally, where iOS gates on whether JavaScript is listening. Both are
+                // right for their platform: RCTDeviceEventEmitter with nothing listening is harmless,
+                // whereas iOS's RCTEventEmitter logs a warning per event.
+                //
+                // "onBaseMapCacheProgress" is core's EventNames.onBaseMapCacheProgress, also spelled out
+                // in iOS's MapsIndoorsData.Event. A typo here delivers no progress rather than failing.
+                reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+                        .emit("onBaseMapCacheProgress", params);
+            }
+
+            @Override
+            public void onComplete(@Nullable MIError error) {
+                if (error != null) {
+                    reject(promise, error);
+                } else {
+                    promise.resolve(null);
+                }
+            }
+        };
+
+        if (apiKeys == null) {
+            manager.synchronizeBaseMapTiles(listener);
+        } else {
+            manager.synchronizeBaseMapTiles(caches, listener);
+        }
+    }
+
+    /**
+     * Required by React Native's NativeEventEmitter, which MapsIndoors.synchronizeBaseMapTiles()
+     * subscribes to for progress. The events themselves are emitted through RCTDeviceEventEmitter, so
+     * there is nothing to do here.
+     */
+    @ReactMethod
+    public void addListener(String eventName) {
+    }
+
+    /**
+     * Counterpart to {@link #addListener(String)}. See its note.
+     */
+    @ReactMethod
+    public void removeListeners(Integer count) {
     }
 }

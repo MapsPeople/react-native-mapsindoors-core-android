@@ -25,7 +25,7 @@ import com.mapsindoorsrn.core.models.MPError;
 public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     public static final String NAME = "DisplayRule";
 
-    private final Gson gson = new Gson();
+    private final Gson gson = RnGson.create();
 
     public MPDisplayRuleModule(@NonNull ReactApplicationContext reactContext) {
         super(reactContext);
