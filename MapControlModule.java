@@ -1,6 +1,7 @@
 package com.mapsindoorsrn.core;
 
 import android.graphics.Typeface;
+import android.util.Log;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -55,7 +56,7 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     public static final String NAME = "MapControlModule";
 
     private RCMapView mMapView;
-    private final Gson gson = new Gson();
+    private final Gson gson = RnGson.create();
     private MapControl mMapControl;
     private OnMapControlReadyListener mcListener;
     private final ReactApplicationContext mCtx;
@@ -71,8 +72,26 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
         return NAME;
     }
 
+    /**
+     * Rejects with the SDK's error, serialised.
+     *
+     * Most callers are SDK callbacks, off React Native's stack, where an unhandled throw takes the
+     * host app down rather than failing the call. {@code MPError} carries {@code MIError.tag},
+     * which is a bare {@code Object}, so this is the same reflection hazard the rest of the module
+     * guards - and the one path where a throw would land when the call has already failed
+     * (MS-3983). A failure to serialise the error still has to reach the caller, so it falls back
+     * to the Gson-free payload rather than being dropped.
+     */
     private void reject(Promise promise, MIError error) {
-        promise.reject("MapControlError", gson.toJson(MPError.fromMIError(error)));
+        final String errorString;
+        try {
+            errorString = gson.toJson(MPError.fromMIError(error));
+        } catch (Exception | StackOverflowError t) {
+            RnGson.rejectSerialisationFailure(promise, "MapControlError",
+                    "Could not serialise error " + (error != null ? error.code : "null") + ": " + t);
+            return;
+        }
+        promise.reject("MapControlError", errorString);
     }
 
     public void setOnMapControlReadyListener(OnMapControlReadyListener listener) {
@@ -389,8 +408,21 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
             }
 
             OnLiveLocationUpdateListener listener = location -> {
+                // Live updates arrive on the SDK's thread and there is no promise to fail, so a
+                // throw here would take the host app down. Drop the update and log it (MS-3983).
+                // StackOverflowError is named because it is the failure being guarded and it is an
+                // Error, not an Exception; OutOfMemoryError and the linkage Errors are left to
+                // propagate, since nothing here can recover from them.
+                final String locationString;
+                try {
+                    locationString = gson.toJson(location);
+                } catch (Exception | StackOverflowError t) {
+                    Log.e(NAME, "Dropping a live location update that could not be serialised", t);
+                    return;
+                }
+
                 WritableMap params = Arguments.createMap();
-                params.putString("location", gson.toJson(location));
+                params.putString("location", locationString);
                 emit(Listener.ON_LIVE_LOCATION_UPDATE, params);
             };
 
@@ -432,7 +464,18 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void getCurrentCameraPosition(final Promise promise) {
-        mCtx.runOnUiQueueThread(() -> promise.resolve(gson.toJson(mMapView.getCurrentCameraPosition())));
+        mCtx.runOnUiQueueThread(() -> {
+            // Runs later on the UI queue, off React Native's stack (MS-3983).
+            final String cameraPositionString;
+            try {
+                cameraPositionString = gson.toJson(mMapView.getCurrentCameraPosition());
+            } catch (Exception | StackOverflowError t) {
+                RnGson.rejectSerialisationFailure(promise, "MapControlError",
+                        "Could not serialise the camera position: " + t);
+                return;
+            }
+            promise.resolve(cameraPositionString);
+        });
     }
 
     @ReactMethod
@@ -464,9 +507,19 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     public void setOnMapClickListener(boolean setup, @Nullable final Boolean consumeEvent) {
         if (setup) {
             mMapControl.setOnMapClickListener((latLng, locations) -> {
-                WritableMap params = Arguments.createMap();
-                params.putString("point", gson.toJson(new MPPoint(latLng)));
-                params.putString("locations", gson.toJson(locations));
+                // Emitted from an SDK callback, off React Native's stack: a throw here takes the
+                // host app down and there is no promise to fail. Drop the event and log it (MS-3983).
+                // The locations list is the payload that crashed in MS-3983, and this fires on every
+                // tap rather than once per search. Consumption is unaffected by a dropped event:
+                // the host app configured it, so report it either way.
+                final WritableMap params = Arguments.createMap();
+                try {
+                    params.putString("point", gson.toJson(new MPPoint(latLng)));
+                    params.putString("locations", gson.toJson(locations));
+                } catch (Exception | StackOverflowError t) {
+                    Log.e(NAME, "Dropping a map click that could not be serialised", t);
+                    return Boolean.TRUE.equals(consumeEvent);
+                }
                 emit(Listener.ON_MAP_CLICK, params);
                 return Boolean.TRUE.equals(consumeEvent);
             });
@@ -479,8 +532,15 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     public void setOnLocationSelectedListener(boolean setup, @Nullable final Boolean consumeEvent) {
         if (setup) {
             mMapControl.setOnLocationSelectedListener(location -> {
-                WritableMap params = Arguments.createMap();
-                params.putString("location", gson.toJson(location));
+                // Emitted from an SDK callback, off React Native's stack: a throw here takes the
+                // host app down and there is no promise to fail. Drop the event and log it (MS-3983).
+                final WritableMap params = Arguments.createMap();
+                try {
+                    params.putString("location", gson.toJson(location));
+                } catch (Exception | StackOverflowError t) {
+                    Log.e(NAME, "Dropping a location selection that could not be serialised", t);
+                    return Boolean.TRUE.equals(consumeEvent);
+                }
                 emit(Listener.ON_LOCATION_SELECTED, params);
                 return Boolean.TRUE.equals(consumeEvent);
             });
@@ -493,8 +553,15 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     public void setOnCurrentVenueChangedListener(boolean setup) {
         if (setup) {
             mMapControl.setOnCurrentVenueChangedListener(venue -> {
-                WritableMap params = Arguments.createMap();
-                params.putString("venue", gson.toJson(venue));
+                // Emitted from an SDK callback, off React Native's stack: a throw here takes the
+                // host app down and there is no promise to fail. Drop the event and log it (MS-3983).
+                final WritableMap params = Arguments.createMap();
+                try {
+                    params.putString("venue", gson.toJson(venue));
+                } catch (Exception | StackOverflowError t) {
+                    Log.e(NAME, "Dropping a venue change that could not be serialised", t);
+                    return;
+                }
                 emit(Listener.ON_VENUE_FOUND_AT_CAMERA_TARGET, params);
             });
         } else {
@@ -506,8 +573,15 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     public void setOnCurrentBuildingChangedListener(boolean setup) {
         if (setup) {
             mMapControl.setOnCurrentBuildingChangedListener(building -> {
-                WritableMap params = Arguments.createMap();
-                params.putString("building", gson.toJson(building));
+                // Emitted from an SDK callback, off React Native's stack: a throw here takes the
+                // host app down and there is no promise to fail. Drop the event and log it (MS-3983).
+                final WritableMap params = Arguments.createMap();
+                try {
+                    params.putString("building", gson.toJson(building));
+                } catch (Exception | StackOverflowError t) {
+                    Log.e(NAME, "Dropping a building change that could not be serialised", t);
+                    return;
+                }
                 emit(Listener.ON_BUILDING_FOUND_AT_CAMERA_TARGET, params);
             });
         } else {
@@ -640,9 +714,16 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @Override
     public void onFloorUpdate(@Nullable MPBuilding building, int floorIndex) {
-        WritableMap params = Arguments.createMap();
-        params.putString("floorIndex", gson.toJson(floorIndex));
-        params.putString("building", gson.toJson(building));
+        // Called by the SDK, off React Native's stack: a throw here takes the host app down and
+        // there is no promise to fail. Drop the event and log it (MS-3983).
+        final WritableMap params = Arguments.createMap();
+        try {
+            params.putString("floorIndex", gson.toJson(floorIndex));
+            params.putString("building", gson.toJson(building));
+        } catch (Exception | StackOverflowError t) {
+            Log.e(NAME, "Dropping a floor update that could not be serialised", t);
+            return;
+        }
         emit(Listener.ON_FLOOR_UPDATE, params);
     }
 
@@ -688,10 +769,17 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @Override
     public void setList(@Nullable List<MPFloor> list) {
-        WritableMap params = Arguments.createMap();
+        // Called by the SDK, off React Native's stack: a throw here takes the host app down and
+        // there is no promise to fail. Drop the event and log it (MS-3983).
+        final WritableMap params = Arguments.createMap();
         params.putString("method", "setList");
         if (list != null) {
-            params.putString("list", gson.toJson(list));
+            try {
+                params.putString("list", gson.toJson(list));
+            } catch (Exception | StackOverflowError t) {
+                Log.e(NAME, "Dropping a floor list that could not be serialised", t);
+                return;
+            }
         }
 
         emit(Listener.FLOOR_SELECTOR, params);
@@ -708,9 +796,16 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @Override
     public void setSelectedFloor(@NonNull MPFloor floor) {
-        WritableMap params = Arguments.createMap();
+        // Called by the SDK, off React Native's stack: a throw here takes the host app down and
+        // there is no promise to fail. Drop the event and log it (MS-3983).
+        final WritableMap params = Arguments.createMap();
         params.putString("method", "setSelectedFloor");
-        params.putString("floor", gson.toJson(floor));
+        try {
+            params.putString("floor", gson.toJson(floor));
+        } catch (Exception | StackOverflowError t) {
+            Log.e(NAME, "Dropping a floor selection that could not be serialised", t);
+            return;
+        }
         emit(Listener.FLOOR_SELECTOR, params);
     }
 
