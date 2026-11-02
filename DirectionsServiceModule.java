@@ -108,6 +108,7 @@ public class DirectionsServiceModule extends ReactContextBaseJavaModule {
                 try {
                     if (route != null) {
                         map.putString("route", gson.toJson(route));
+                        map.putString("routeId", RouteStore.keep(route));
                     }
                     if (error != null) {
                         map.putString("error", gson.toJson(error));

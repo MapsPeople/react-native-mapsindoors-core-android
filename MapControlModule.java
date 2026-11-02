@@ -55,10 +55,12 @@ import java.util.Map;
 public class MapControlModule extends ReactContextBaseJavaModule implements MPCameraEventListener, OnFloorUpdateListener, MPFloorSelectorInterface {
     public static final String NAME = "MapControlModule";
 
-    private RCMapView mMapView;
+    // Volatile: written on the UI thread, read from React Native's module thread too.
+    private volatile RCMapView mMapView;
     private final Gson gson = RnGson.create();
-    private MapControl mMapControl;
+    private volatile MapControl mMapControl;
     private OnMapControlReadyListener mcListener;
+    @Nullable private Runnable mOnMapControlDestroyed;
     private final ReactApplicationContext mCtx;
 
     public MapControlModule(@NonNull ReactApplicationContext reactContext) {
@@ -102,14 +104,94 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
         mCtx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit(listener.method, data);
     }
 
+    public void setOnMapControlDestroyedListener(@Nullable Runnable listener) {
+        mOnMapControlDestroyed = listener;
+    }
+
     public void setView(RCMapView view) {
         mMapView = view;
+    }
+
+    /**
+     * Releases {@code view} and its MapControl once React Native unmounts it. Call on the UI thread,
+     * before the map itself is destroyed.
+     *
+     * Left alive, the MapControl stays registered with the SDK, which keeps it and its map reachable
+     * and has it react to the next map's display rule changes (SPEX-2885). A no-op for any other view,
+     * as a new map may mount before the old one is dropped.
+     */
+    public void onViewDropped(RCMapView view) {
+        if (mMapView != view) {
+            return;
+        }
+        destroyMapControl();
+        mMapView = null;
+    }
+
+    private void destroyMapControl() {
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            return;
+        }
+        mMapControl = null;
+        liveLocationUpdateListeners.clear();
+        // Set by the destroyed MapControl, which it would keep reachable.
+        onFloorSelectionChangedListener = null;
+        mapControl.onDestroy();
+        if (mOnMapControlDestroyed != null) {
+            mOnMapControlDestroyed.run();
+        }
+    }
+
+    /**
+     * The MapControl, or {@code null} once {@code promise} is rejected: there is none before
+     * {@code initMapControl}, nor after its view is dropped.
+     */
+    @Nullable
+    private MapControl requireMapControl(@Nullable Promise promise) {
+        MapControl mapControl = mMapControl;
+        if (mapControl == null && promise != null) {
+            promise.reject("MapControlError", "mapControl not available");
+        }
+        return mapControl;
+    }
+
+    /**
+     * Logs a call that has no promise to reject: without a MapControl, JS would otherwise believe the
+     * listener was set.
+     */
+    private void warnNoMapControl(String method) {
+        Log.w(NAME, method + ": mapControl not available, ignored");
+    }
+
+    private interface MapControlAction {
+        void run(@NonNull MapControl mapControl);
+    }
+
+    /**
+     * Runs {@code action} on the UI thread with the MapControl. Read there, where it is destroyed, so
+     * it cannot go between the check and the call. Without one, rejects {@code promise} if given.
+     */
+    private void runOnUiQueueThread(@Nullable Promise promise, MapControlAction action) {
+        mCtx.runOnUiQueueThread(() -> {
+            MapControl mapControl = requireMapControl(promise);
+            if (mapControl != null) {
+                action.run(mapControl);
+            }
+        });
     }
 
     @ReactMethod
     public void initMapControl(ReadableMap config, final Promise promise) {
         getCurrentActivity().runOnUiThread(()-> {
-            MPIMapConfig mpMapConfig = mMapView.parseConfig(config, getCurrentActivity());
+            RCMapView mapView = mMapView;
+            if (mapView == null) {
+                promise.reject("MapControlError", "MapView not available");
+                return;
+            }
+            // Replaced below: destroyed first so it unregisters from the SDK.
+            destroyMapControl();
+            MPIMapConfig mpMapConfig = mapView.parseConfig(config, getCurrentActivity());
             MapControl.create(mpMapConfig, (mapControl, miError) -> {
                 mcListener.onMapControlReady(mapControl,miError);
                 if (mapControl != null) {
@@ -130,8 +212,9 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
             locations.add(MapsIndoors.getLocationById(locationId));
         }
         MPFilterBehavior filterBehavior = gson.fromJson(filterBehaviorString, MPFilterBehavior.class);
-        if (mMapControl != null) {
-            mMapControl.setFilter(locations, filterBehavior);
+        MapControl mapControl = mMapControl;
+        if (mapControl != null) {
+            mapControl.setFilter(locations, filterBehavior);
             promise.resolve(true);
         }else {
             promise.resolve(false);
@@ -142,8 +225,9 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     public void setFilter(String filterString, String filterBehaviorString, final Promise promise) {
         MPFilter filter = gson.fromJson(filterString, Filter.class).toMPFilter();
         MPFilterBehavior filterBehavior = gson.fromJson(filterBehaviorString, MPFilterBehavior.class);
-        if (mMapControl != null && filter != null) {
-            mMapControl.setFilter(filter, filterBehavior, null);
+        MapControl mapControl = mMapControl;
+        if (mapControl != null && filter != null) {
+            mapControl.setFilter(filter, filterBehavior, null);
             promise.resolve(true);
         }else {
             promise.resolve(false);
@@ -152,12 +236,13 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void clearFilter(final Promise promise) {
-        if (mMapControl != null) {
-            mCtx.runOnUiQueueThread(() -> {
-                mMapControl.clearFilter();
-                promise.resolve(null);
-            });
-        }
+        mCtx.runOnUiQueueThread(() -> {
+            MapControl mapControl = mMapControl;
+            if (mapControl != null) {
+                mapControl.clearFilter();
+            }
+            promise.resolve(null);
+        });
     }
 
     @ReactMethod
@@ -168,8 +253,9 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
             locations.add(MapsIndoors.getLocationById(locationId));
         }
         MPHighlightBehavior highlightBehavior = gson.fromJson(highlightBehaviorString, MPHighlightBehavior.class);
-        if (mMapControl != null) {
-            mMapControl.setHighlight(locations, highlightBehavior);
+        MapControl mapControl = mMapControl;
+        if (mapControl != null) {
+            mapControl.setHighlight(locations, highlightBehavior);
             promise.resolve(true);
         }else {
             promise.resolve(false);
@@ -178,20 +264,22 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void clearHighlight(final Promise promise) {
-        if (mMapControl != null) {
-            mCtx.runOnUiQueueThread(() -> {
-                mMapControl.clearHighlight();
-                promise.resolve(null);
-            });
-        }
+        mCtx.runOnUiQueueThread(() -> {
+            MapControl mapControl = mMapControl;
+            if (mapControl != null) {
+                mapControl.clearHighlight();
+            }
+            promise.resolve(null);
+        });
     }
 
     @ReactMethod
     public void showUserPosition(boolean show, final Promise promise) {
-        if (mMapControl != null) {
-            mMapControl.showUserPosition(show);
-            promise.resolve(null);
+        MapControl mapControl = mMapControl;
+        if (mapControl != null) {
+            mapControl.showUserPosition(show);
         }
+        promise.resolve(null);
     }
 
     @ReactMethod
@@ -200,36 +288,36 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
             case "MPLocation": {
                 MPLocation location = gson.fromJson(entityString, Location.class).toMPLocation();
                 if (maxZoom != -999) {
-                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(location, maxZoom));
+                    runOnUiQueueThread(null, mapControl -> mapControl.goTo(location, maxZoom));
                 }else {
-                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(location));
+                    runOnUiQueueThread(null, mapControl -> mapControl.goTo(location));
                 }
                 break;
             }
             case "MPFloor": {
                 MPFloor floor = gson.fromJson(entityString, MPFloor.class);
                 if (maxZoom != -999) {
-                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(floor, maxZoom));
+                    runOnUiQueueThread(null, mapControl -> mapControl.goTo(floor, maxZoom));
                 }else {
-                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(floor));
+                    runOnUiQueueThread(null, mapControl -> mapControl.goTo(floor));
                 }
                 break;
             }
             case "MPBuilding": {
                 MPBuilding building = gson.fromJson(entityString, MPBuilding.class);
                 if (maxZoom != -999) {
-                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(building, maxZoom));
+                    runOnUiQueueThread(null, mapControl -> mapControl.goTo(building, maxZoom));
                 }else {
-                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(building));
+                    runOnUiQueueThread(null, mapControl -> mapControl.goTo(building));
                 }
                 break;
             }
             case "MPVenue":  {
                 MPVenue venue = gson.fromJson(entityString, MPVenue.class);
                 if (maxZoom != -999) {
-                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(venue, maxZoom));
+                    runOnUiQueueThread(null, mapControl -> mapControl.goTo(venue, maxZoom));
                 }else {
-                    mCtx.runOnUiQueueThread(() -> mMapControl.goTo(venue));
+                    runOnUiQueueThread(null, mapControl -> mapControl.goTo(venue));
                 }
                 break;
             }
@@ -239,7 +327,12 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void getCurrentVenue(final Promise promise) {
-        final MPVenue venue = mMapControl.getCurrentVenue();
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            promise.resolve(null);
+            return;
+        }
+        final MPVenue venue = mapControl.getCurrentVenue();
         if (venue != null) {
             promise.resolve(gson.toJson(venue));
         } else {
@@ -249,7 +342,12 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void getCurrentBuilding(final Promise promise) {
-        final MPBuilding building = mMapControl.getCurrentBuilding();
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            promise.resolve(null);
+            return;
+        }
+        final MPBuilding building = mapControl.getCurrentBuilding();
         if (building != null) {
             promise.resolve(gson.toJson(building));
         } else {
@@ -260,8 +358,8 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     @ReactMethod
     public void selectVenue(String venueString, boolean moveCamera, final Promise promise) {
         MPVenue venue = gson.fromJson(venueString, MPVenue.class);
-        mCtx.runOnUiQueueThread(() -> {
-            mMapControl.selectVenue(venue, moveCamera);
+        runOnUiQueueThread(promise, mapControl -> {
+            mapControl.selectVenue(venue, moveCamera);
             promise.resolve(null);
         });
     }
@@ -269,8 +367,8 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     @ReactMethod
     public void selectBuilding(String buildingString, boolean moveCamera, final Promise promise) {
         MPBuilding building = gson.fromJson(buildingString, MPBuilding.class);
-        mCtx.runOnUiQueueThread(() -> {
-            mMapControl.selectBuilding(building, moveCamera);
+        runOnUiQueueThread(promise, mapControl -> {
+            mapControl.selectBuilding(building, moveCamera);
             promise.resolve(null);
         });
     }
@@ -279,8 +377,8 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     public void selectLocation(String locationString, String behaviorString, final Promise promise) {
         MPLocation location = gson.fromJson(locationString, Location.class).toMPLocation();
         MPSelectionBehavior behavior = gson.fromJson(behaviorString, MPSelectionBehavior.class);
-        mCtx.runOnUiQueueThread(() -> {
-            mMapControl.selectLocation(location, behavior);
+        runOnUiQueueThread(promise, mapControl -> {
+            mapControl.selectLocation(location, behavior);
             promise.resolve(null);
         });
 
@@ -289,8 +387,8 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     @ReactMethod
     public void selectLocationWithId(String locationId, String behaviorString, final Promise promise) {
         MPSelectionBehavior behavior = gson.fromJson(behaviorString, MPSelectionBehavior.class);
-        mCtx.runOnUiQueueThread(() -> {
-            mMapControl.selectLocation(locationId, behavior);
+        runOnUiQueueThread(promise, mapControl -> {
+            mapControl.selectLocation(locationId, behavior);
             promise.resolve(null);
         });
     }
@@ -298,113 +396,166 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     @ReactMethod
     public void setMapPadding(int start, int top, int end, int bottom, final Promise promise) {
         double density =  mCtx.getResources().getDisplayMetrics().density;
-        mCtx.runOnUiQueueThread(() -> {
-            mMapControl.setMapPadding((int)Math.round(start * density), (int)Math.round(top * density), (int)Math.round(end * density), (int)   Math.round(bottom * density));
+        runOnUiQueueThread(promise, mapControl -> {
+            mapControl.setMapPadding((int)Math.round(start * density), (int)Math.round(top * density), (int)Math.round(end * density), (int)   Math.round(bottom * density));
             promise.resolve(null);
         });
     }
 
     @ReactMethod
     public void getMapViewPaddingStart(final Promise promise) {
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
         double density =  mCtx.getResources().getDisplayMetrics().density;
-        promise.resolve((int)Math.round(mMapControl.getMapViewPaddingStart()/density));
+        promise.resolve((int)Math.round(mapControl.getMapViewPaddingStart()/density));
     }
 
     @ReactMethod
     public void getMapViewPaddingTop(final Promise promise) {
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
         double density =  mCtx.getResources().getDisplayMetrics().density;
-        promise.resolve((int)Math.round(mMapControl.getMapViewPaddingTop()/density));
+        promise.resolve((int)Math.round(mapControl.getMapViewPaddingTop()/density));
     }
 
     @ReactMethod
     public void getMapViewPaddingEnd(final Promise promise) {
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
         double density =  mCtx.getResources().getDisplayMetrics().density;
-        promise.resolve((int)Math.round(mMapControl.getMapViewPaddingEnd()/density));
+        promise.resolve((int)Math.round(mapControl.getMapViewPaddingEnd()/density));
     }
 
     @ReactMethod
     public void getMapViewPaddingBottom(final Promise promise) {
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
         double density =  mCtx.getResources().getDisplayMetrics().density;
-        promise.resolve((int)Math.round(mMapControl.getMapViewPaddingBottom()/density));
+        promise.resolve((int)Math.round(mapControl.getMapViewPaddingBottom()/density));
     }
 
     @ReactMethod
     public void setMapStyle(String mapStyleString, final Promise promise) {
-        mMapControl.setMapStyle(gson.fromJson(mapStyleString, MPMapStyle.class));
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
+        mapControl.setMapStyle(gson.fromJson(mapStyleString, MPMapStyle.class));
         promise.resolve(null);
     }
 
     @ReactMethod
     public void getMapStyle(final Promise promise) {
-        MPMapStyle mapStyle = mMapControl.getMapStyle();
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
+        MPMapStyle mapStyle = mapControl.getMapStyle();
         String mapStyleString = mapStyle != null ? gson.toJson(mapStyle) : null;
         promise.resolve(mapStyleString);
     }
 
     @ReactMethod
     public void showInfoWindowOnClickedLocation(boolean show, final Promise promise) {
-        mMapControl.showInfoWindowOnClickedLocation(show);
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
+        mapControl.showInfoWindowOnClickedLocation(show);
         promise.resolve(null);
     }
 
     @ReactMethod
     public void deSelectLocation(final Promise promise) {
-        mCtx.runOnUiQueueThread(() -> {
-            mMapControl.deSelectLocation();
+        runOnUiQueueThread(promise, mapControl -> {
+            mapControl.deSelectLocation();
             promise.resolve(null);
         });
     }
 
     @ReactMethod
     public void getCurrentBuildingFloor(final Promise promise) {
-        MPFloor floor = mMapControl.getCurrentBuildingFloor();
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            promise.resolve(null);
+            return;
+        }
+        MPFloor floor = mapControl.getCurrentBuildingFloor();
         String floorString = floor != null ? gson.toJson(floor) : null;
         promise.resolve(floorString);
     }
 
     @ReactMethod
     public void getCurrentFloorIndex(final Promise promise) {
-        promise.resolve(mMapControl.getCurrentFloorIndex());
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
+        promise.resolve(mapControl.getCurrentFloorIndex());
     }
 
     @ReactMethod
     public void getCurrentMapsIndoorsZoom(final Promise promise) {
-        promise.resolve(mMapControl.getCurrentMapsIndoorsZoom());
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
+        promise.resolve(mapControl.getCurrentMapsIndoorsZoom());
     }
 
     @ReactMethod
     public void selectFloor(int floorIndex, final Promise promise) {
-        mCtx.runOnUiQueueThread(() -> {
-            mMapControl.selectFloor(floorIndex);
+        runOnUiQueueThread(promise, mapControl -> {
+            mapControl.selectFloor(floorIndex);
             promise.resolve(null);
         });
     }
 
     @ReactMethod
     public void isFloorSelectorHidden(final Promise promise) {
-        promise.resolve(mMapControl.isFloorSelectorHidden());
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
+        promise.resolve(mapControl.isFloorSelectorHidden());
     }
 
     @ReactMethod
     public void hideFloorSelector(boolean hide, final Promise promise) {
-        mCtx.runOnUiQueueThread(() -> {
-            mMapControl.hideFloorSelector(hide);
+        runOnUiQueueThread(promise, mapControl -> {
+            mapControl.hideFloorSelector(hide);
             promise.resolve(null);
         });
     }
 
     @ReactMethod
     public void isUserPositionShown(final Promise promise) {
-        promise.resolve(mMapControl.isUserPositionShown());
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
+        promise.resolve(mapControl.isUserPositionShown());
     }
 
     private final Map<String, OnLiveLocationUpdateListener> liveLocationUpdateListeners = new HashMap<>();
     @ReactMethod
     public void enableLiveData(String domainType, boolean hasListener, final Promise promise) {
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
         if (hasListener) {
             if (liveLocationUpdateListeners.containsKey(domainType)) {
                 liveLocationUpdateListeners.remove(domainType);
-                mMapControl.disableLiveData(domainType);
+                mapControl.disableLiveData(domainType);
             }
 
             OnLiveLocationUpdateListener listener = location -> {
@@ -428,17 +579,22 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
             liveLocationUpdateListeners.put(domainType, listener);
 
-            mMapControl.enableLiveData(domainType, listener);
+            mapControl.enableLiveData(domainType, listener);
         } else {
-            mMapControl.enableLiveData(domainType);
+            mapControl.enableLiveData(domainType);
         }
         promise.resolve(null);
     }
 
     @ReactMethod
     public void disableLiveData(String domainType, final Promise promise) {
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            promise.resolve(null);
+            return;
+        }
         liveLocationUpdateListeners.remove(domainType);
-        mMapControl.disableLiveData(domainType);
+        mapControl.disableLiveData(domainType);
         promise.resolve(null);
     }
 
@@ -446,8 +602,13 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     public void animateCamera(String updateString, @Nullable Integer duration, final Promise promise) {
         MPCameraUpdate update = gson.fromJson(updateString, MPCameraUpdate.class);
         mCtx.runOnUiQueueThread(() -> {
+            RCMapView mapView = mMapView;
+            if (mapView == null) {
+                promise.reject("MapControlError", "MapView not available");
+                return;
+            }
             // we have to parse null as -1 because iOS cannot parse null
-            mMapView.animateCamera(update, (duration == - 1 ? null : duration), error -> {
+            mapView.animateCamera(update, (duration == - 1 ? null : duration), error -> {
                 promise.resolve(null);
             });
         });
@@ -457,7 +618,12 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     public void moveCamera(String updateString, final Promise promise) {
         MPCameraUpdate update = gson.fromJson(updateString, MPCameraUpdate.class);
         mCtx.runOnUiQueueThread(() -> {
-            mMapView.moveCamera(update);
+            RCMapView mapView = mMapView;
+            if (mapView == null) {
+                promise.reject("MapControlError", "MapView not available");
+                return;
+            }
+            mapView.moveCamera(update);
             promise.resolve(null);
         });
     }
@@ -466,9 +632,14 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
     public void getCurrentCameraPosition(final Promise promise) {
         mCtx.runOnUiQueueThread(() -> {
             // Runs later on the UI queue, off React Native's stack (MS-3983).
+            RCMapView mapView = mMapView;
+            if (mapView == null) {
+                promise.reject("MapControlError", "MapView not available");
+                return;
+            }
             final String cameraPositionString;
             try {
-                cameraPositionString = gson.toJson(mMapView.getCurrentCameraPosition());
+                cameraPositionString = gson.toJson(mapView.getCurrentCameraPosition());
             } catch (Exception | StackOverflowError t) {
                 RnGson.rejectSerialisationFailure(promise, "MapControlError",
                         "Could not serialise the camera position: " + t);
@@ -480,13 +651,14 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void setFloorSelector(boolean setup, Boolean isAutoFloorChangeEnabled, final Promise promise) {
-        if (mMapControl != null) {
+        MapControl mapControl = mMapControl;
+        if (mapControl != null) {
             if (setup) {
                 autoFloorChange = isAutoFloorChangeEnabled;
-                mCtx.runOnUiQueueThread(() -> mMapControl.setFloorSelector(this));
+                runOnUiQueueThread(null, current -> current.setFloorSelector(this));
             } else {
                 autoFloorChange = true;
-                mMapControl.setFloorSelector(null);
+                mapControl.setFloorSelector(null);
             }
         }
         promise.resolve(null);
@@ -494,9 +666,13 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void setLabelOptions(Integer textSize, String color, boolean showHalo, final Promise promise) {
-        mMapControl.setMapLabelFont(Typeface.DEFAULT, color, showHalo);
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
+        mapControl.setMapLabelFont(Typeface.DEFAULT, color, showHalo);
         if (textSize != -1) {
-            mMapControl.setMapLabelTextSize(textSize);
+            mapControl.setMapLabelTextSize(textSize);
         }
         promise.resolve(null);
     }
@@ -505,8 +681,13 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void setOnMapClickListener(boolean setup, @Nullable final Boolean consumeEvent) {
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            warnNoMapControl("setOnMapClickListener");
+            return;
+        }
         if (setup) {
-            mMapControl.setOnMapClickListener((latLng, locations) -> {
+            mapControl.setOnMapClickListener((latLng, locations) -> {
                 // Emitted from an SDK callback, off React Native's stack: a throw here takes the
                 // host app down and there is no promise to fail. Drop the event and log it (MS-3983).
                 // The locations list is the payload that crashed in MS-3983, and this fires on every
@@ -524,14 +705,19 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
                 return Boolean.TRUE.equals(consumeEvent);
             });
         } else {
-            mMapControl.setOnMapClickListener(null);
+            mapControl.setOnMapClickListener(null);
         }
     }
 
     @ReactMethod
     public void setOnLocationSelectedListener(boolean setup, @Nullable final Boolean consumeEvent) {
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            warnNoMapControl("setOnLocationSelectedListener");
+            return;
+        }
         if (setup) {
-            mMapControl.setOnLocationSelectedListener(location -> {
+            mapControl.setOnLocationSelectedListener(location -> {
                 // Emitted from an SDK callback, off React Native's stack: a throw here takes the
                 // host app down and there is no promise to fail. Drop the event and log it (MS-3983).
                 final WritableMap params = Arguments.createMap();
@@ -545,14 +731,19 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
                 return Boolean.TRUE.equals(consumeEvent);
             });
         } else {
-            mMapControl.setOnLocationSelectedListener(null);
+            mapControl.setOnLocationSelectedListener(null);
         }
     }
 
     @ReactMethod
     public void setOnCurrentVenueChangedListener(boolean setup) {
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            warnNoMapControl("setOnCurrentVenueChangedListener");
+            return;
+        }
         if (setup) {
-            mMapControl.setOnCurrentVenueChangedListener(venue -> {
+            mapControl.setOnCurrentVenueChangedListener(venue -> {
                 // Emitted from an SDK callback, off React Native's stack: a throw here takes the
                 // host app down and there is no promise to fail. Drop the event and log it (MS-3983).
                 final WritableMap params = Arguments.createMap();
@@ -565,14 +756,19 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
                 emit(Listener.ON_VENUE_FOUND_AT_CAMERA_TARGET, params);
             });
         } else {
-            mMapControl.setOnCurrentVenueChangedListener(null);
+            mapControl.setOnCurrentVenueChangedListener(null);
         }
     }
 
     @ReactMethod
     public void setOnCurrentBuildingChangedListener(boolean setup) {
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            warnNoMapControl("setOnCurrentBuildingChangedListener");
+            return;
+        }
         if (setup) {
-            mMapControl.setOnCurrentBuildingChangedListener(building -> {
+            mapControl.setOnCurrentBuildingChangedListener(building -> {
                 // Emitted from an SDK callback, off React Native's stack: a throw here takes the
                 // host app down and there is no promise to fail. Drop the event and log it (MS-3983).
                 final WritableMap params = Arguments.createMap();
@@ -585,63 +781,87 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
                 emit(Listener.ON_BUILDING_FOUND_AT_CAMERA_TARGET, params);
             });
         } else {
-            mMapControl.setOnCurrentBuildingChangedListener(null);
+            mapControl.setOnCurrentBuildingChangedListener(null);
         }
     }
 
     @ReactMethod
     public void setOnMarkerClickListener(boolean setup, @Nullable final Boolean consumeEvent) {
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            warnNoMapControl("setOnMarkerClickListener");
+            return;
+        }
         if (setup) {
-            mMapControl.setOnMarkerClickListener(marker -> {
+            mapControl.setOnMarkerClickListener(marker -> {
                 WritableMap params = Arguments.createMap();
                 params.putString("locationId", marker.getId());
                 emit(Listener.ON_MARKER_CLICK, params);
                 return Boolean.TRUE.equals(consumeEvent);
             });
         } else {
-            mMapControl.setOnMarkerClickListener(null);
+            mapControl.setOnMarkerClickListener(null);
         }
     }
 
     @ReactMethod
     public void setOnMarkerInfoWindowClickListener(boolean setup) {
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            warnNoMapControl("setOnMarkerInfoWindowClickListener");
+            return;
+        }
         if (setup) {
-            mMapControl.setOnMarkerInfoWindowClickListener(marker -> {
+            mapControl.setOnMarkerInfoWindowClickListener(marker -> {
                 WritableMap params = Arguments.createMap();
                 params.putString("locationId", marker.getId());
                 emit(Listener.ON_INFO_WINDOW_CLICK, params);
             });
         } else {
-            mMapControl.setOnMarkerInfoWindowClickListener(null);
+            mapControl.setOnMarkerInfoWindowClickListener(null);
         }
     }
 
     @ReactMethod
     public void setMPCameraEventListener(boolean setup) {
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            warnNoMapControl("setMPCameraEventListener");
+            return;
+        }
         if (setup) {
-            mMapControl.addOnCameraEventListener(this);
+            mapControl.addOnCameraEventListener(this);
         } else {
-            mMapControl.removeOnCameraEventListener(this);
+            mapControl.removeOnCameraEventListener(this);
         }
     }
 
     @ReactMethod
     public void setOnFloorUpdateListener(boolean setup) {
+        MapControl mapControl = mMapControl;
+        if (mapControl == null) {
+            warnNoMapControl("setOnFloorUpdateListener");
+            return;
+        }
         if (setup) {
-            mMapControl.addOnFloorUpdateListener(this);
+            mapControl.addOnFloorUpdateListener(this);
         } else {
-            mMapControl.removeOnFloorUpdateListener(this);
+            mapControl.removeOnFloorUpdateListener(this);
         }
     }
 
     @ReactMethod
     public void setBuildingSelectionMode(Double selectionMode, final Promise promise) {
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
         switch (selectionMode.intValue()) {
             case 0:
-                mMapControl.setBuildingSelectionMode(MPSelectionMode.MANUAL);
+                mapControl.setBuildingSelectionMode(MPSelectionMode.MANUAL);
                 break;
             case 1:
-                mMapControl.setBuildingSelectionMode(MPSelectionMode.AUTOMATIC);
+                mapControl.setBuildingSelectionMode(MPSelectionMode.AUTOMATIC);
                 break;
         }
         promise.resolve(null);
@@ -649,17 +869,25 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void getBuildingSelectionMode(final Promise promise) {
-        promise.resolve(mMapControl.getBuildingSelectionMode().ordinal());
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
+        promise.resolve(mapControl.getBuildingSelectionMode().ordinal());
     }
 
     @ReactMethod
     public void setFloorSelectionMode(Double selectionMode, final Promise promise) {
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
         switch (selectionMode.intValue()) {
             case 0:
-                mMapControl.setFloorSelectionMode(MPSelectionMode.MANUAL);
+                mapControl.setFloorSelectionMode(MPSelectionMode.MANUAL);
                 break;
             case 1:
-                mMapControl.setFloorSelectionMode(MPSelectionMode.AUTOMATIC);
+                mapControl.setFloorSelectionMode(MPSelectionMode.AUTOMATIC);
                 break;
         }
         promise.resolve(null);
@@ -667,7 +895,11 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
 
     @ReactMethod
     public void getFloorSelectionMode(final Promise promise) {
-        promise.resolve(mMapControl.getFloorSelectionMode().ordinal());
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
+        promise.resolve(mapControl.getFloorSelectionMode().ordinal());
     }
 
     @ReactMethod
@@ -696,15 +928,19 @@ public class MapControlModule extends ReactContextBaseJavaModule implements MPCa
                     break;
             }
         }
-        getCurrentActivity().runOnUiThread(()-> {
-            mMapControl.setHiddenFeatures(features);
+        runOnUiQueueThread(promise, mapControl -> {
+            mapControl.setHiddenFeatures(features);
             promise.resolve(null);
         });
     }
 
     @ReactMethod
     public void getHiddenFeatures(final Promise promise) {
-        List<MPFeatureType> features = mMapControl.getHiddenFeatures();
+        MapControl mapControl = requireMapControl(promise);
+        if (mapControl == null) {
+            return;
+        }
+        List<MPFeatureType> features = mapControl.getHiddenFeatures();
         List<Integer> featureStrings = new ArrayList<>();
         for (MPFeatureType feature : features) {
             featureStrings.add(feature.ordinal());

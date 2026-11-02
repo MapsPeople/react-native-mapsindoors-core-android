@@ -66,6 +66,11 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
     public DirectionsRendererModule(@NonNull ReactApplicationContext reactContext, MapControlModule mapControl) {
         super(reactContext);
         mapControl.setOnMapControlReadyListener(this);
+        // The renderer holds the MapControl, so it goes with it.
+        mapControl.setOnMapControlDestroyedListener(() -> {
+            mMapControl = null;
+            mRenderer = null;
+        });
         mCtx = reactContext;
     }
 
@@ -288,10 +293,13 @@ public class DirectionsRendererModule extends ReactContextBaseJavaModule impleme
     }
 
     @ReactMethod
-    public void setRoute(String routeString, String icons, int legIndex, final Promise promise) {
+    public void setRoute(String routeString, String icons, int legIndex, @Nullable String routeId, final Promise promise) {
         if (mRenderer != null) {
             Context ctx = mCtx.getApplicationContext();
-            MPRoute route = gson.fromJson(routeString, MPRoute.class);
+            // The route getRoute kept, when JavaScript names one: only that instance carries the
+            // endpoints the directions Insights events report.
+            MPRoute kept = RouteStore.get(routeId);
+            MPRoute route = kept != null ? kept : gson.fromJson(routeString, MPRoute.class);
             if (icons != null) {
                 new Handler().post(()-> {
                     // Posted to the main looper, so this body is off React Native's stack: a throw

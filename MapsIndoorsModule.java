@@ -25,6 +25,7 @@ import com.mapsindoors.core.MPDataSetManagerStatus;
 import com.mapsindoors.core.MPDisplayRule;
 import com.mapsindoors.core.MPFilter;
 import com.mapsindoors.core.MPLocation;
+import com.mapsindoors.core.MPLogger;
 import com.mapsindoors.core.MPPoint;
 import com.mapsindoors.core.MPQuery;
 import com.mapsindoors.core.MPSolution;
@@ -98,9 +99,23 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
         promise.reject("MapsIndoorsError", errorString);
     }
 
+    /**
+     * Names this wrapper as the component behind the MapsIndoors Insights session, so React Native
+     * apps are told apart from native ones in the rollups.
+     *
+     * The SDK snapshots the component into the session when the session starts, inside
+     * {@code MapsIndoors.load}, so this has to run on the same call, right before it. The version
+     * comes from JS, which reads it from the map package's own package.json.
+     */
+    private void setReactNativeComponent(@Nullable String sdkVersion) {
+        MPLogger.setCustomComponent("React Native/android SDK", sdkVersion != null ? sdkVersion : "unknown");
+    }
+
     @ReactMethod
-    public void loadMapsIndoors(String apiKey, ReadableArray optionalStrings, Promise promise) {
+    public void loadMapsIndoors(String apiKey, ReadableArray optionalStrings, @Nullable String sdkVersion, Promise promise) {
         try {
+            setReactNativeComponent(sdkVersion);
+            RouteStore.clear();
             if (optionalStrings != null) {
                 List<String> venueList = new ArrayList<>();
                 for (int i = 0; i < optionalStrings.size(); i++) {
@@ -352,6 +367,7 @@ public class MapsIndoorsModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void destroy(final Promise promise) {
+        RouteStore.clear();
         MapsIndoors.destroy();
         promise.resolve(null);
     }
