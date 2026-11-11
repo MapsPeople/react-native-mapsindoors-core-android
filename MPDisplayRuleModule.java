@@ -921,6 +921,30 @@ public class MPDisplayRuleModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void getIconZoomFactor(String displayRuleId, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            // Rules without a parent (highlight, selection) can resolve no factor. The renderer then
+            // uses 1.0, which is also what iOS reports.
+            Double factor = displayRule.getIconZoomFactor();
+            promise.resolve(factor != null ? factor : 1.0);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
+    public void setIconZoomFactor(String displayRuleId, Double factor, final Promise promise) {
+        MPDisplayRule displayRule = getRule(displayRuleId);
+        if (displayRule != null) {
+            displayRule.setIconZoomFactor(factor);
+            promise.resolve(null);
+        } else {
+            reject(promise, displayRuleId);
+        }
+    }
+
+    @ReactMethod
     public void getIconPlacement(String displayRuleId, final Promise promise) {
         MPDisplayRule displayRule = getRule(displayRuleId);
         if (displayRule != null) {
